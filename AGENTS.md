@@ -22,5 +22,6 @@ This project teaches beginners to connect real electronics. New or changed compo
 - `dist/style.css`: pin appearance and readable layouts.
 - `dist/index.html`: library entry, accessible label, and versioned asset references.
 - `README.md`: add or revise the user-facing component and simulation notes when the new part changes the project overview.
+- `COMPONENTS.md`: maintain the cross-project survey and prioritized catalog backlog; distinguish observed recurring parts from items still awaiting part-specific research.
 
 If any market specification is uncertain, research it before writing it into the interface. Do not invent ratings or treat one variant's specifications as universal for a product family.

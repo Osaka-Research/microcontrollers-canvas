@@ -21,7 +21,7 @@ This is a working survey of recurring parts found across beginner mobile robot b
 
 - [Geekobot obstacle-avoiding robot parts list](https://geekobot.in/in/projects/obstacle-avoiding-robot) lists an Uno, L298N, HC-SR04, SG90, 2WD chassis, two 18650 cells and holder, boost converter, and breadboard.
 - [Cirkit Designer obstacle-avoiding robot](https://docs.cirkitdesigner.com/project/published/32d26e14-0a74-4f81-b054-6bbaf4f124d4/arduino-uno-based-obstacle-avoiding-robot-with-ultrasonic-sensor-and-servo-motor) shows the common Uno + ultrasonic + servo + dual-motor-driver wiring pattern and shared ground.
-- [NodeMCU DevKit v1.0 open hardware files](https://github.com/nodemcu/nodemcu-devkit-v1.0) document the board schematic and two 1×15 headers.
+- [NodeMCU DevKit v1.0 open hardware files](https://github.com/nodemcu/nodemcu-devkit-v1.0) document the board schematic and two 1×15 headers; the repo [top-view board photo](https://raw.githubusercontent.com/nodemcu/nodemcu-devkit-v1.0/master/Documents/NodeMCU_DEVKIT_1.0.jpg) is the visual reference for the board drawing.
 - [Pololu 3pi robot guide](https://www.pololu.com/docs/0j21/all) covers a compact differential-drive robot with two motors, reflectance sensors, batteries, and motor control.
 - [Pololu 3pi+ 2040 controller schematic](https://www.pololu.com/file/0J1940/3pi-2040-control-board-schematic.pdf) includes motor drivers and Hall-effect wheel encoders.
 - [Arduino line-following robot project sheet](https://cdnbbs.s3waas.gov.in/s3kv0172cc68f8c6297abfb8c3c9e575b8/uploads/2025/10/2025100333.pdf) uses IR sensors, a motor driver, motors, controller, and battery.

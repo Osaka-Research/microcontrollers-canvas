@@ -4,7 +4,7 @@ This project teaches beginners to connect real electronics. New or changed compo
 
 ## Before adding or changing a component
 
-- Choose a specific, commonly available part or clearly label the component as a virtual abstraction. Prefer a manufacturer part number over a generic label.
+- Choose a specific, commonly available part or clearly label the component as a virtual abstraction. Prefer a manufacturer part number over a generic label. For battery variants, identify chemistry, cell count, series/parallel arrangement, nominal voltage, and a supported capacity rating (or explain why capacity varies with load).
 - Verify its electrical and mechanical details against a current manufacturer datasheet or product page. Record the source URL in the component inspector or project documentation.
 - Show every physical terminal the user would wire. Examples: a servo has signal, supply, and ground; an LED has anode and cathode; a DC motor has two motor terminals; a battery has positive and negative terminals; a development board exposes its labeled header pins.
 - Label terminals as they appear on the real part, and add wire color or polarity where that helps a beginner.

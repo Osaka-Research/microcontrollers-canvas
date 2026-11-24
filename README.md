@@ -5,7 +5,7 @@ A browser based canvas for connecting real microcontroller pins to recognizable 
 ## Components
 
 - **Virtual Microcontroller** has four simulated digital outputs. It is not a specific physical board.
-- **NodeMCU ESP8266** shows D0–D8, RX, TX, 3V3, and GND. The chip uses 3.3 V logic; its GPIO pins cannot directly power motors or servos.
+- **NodeMCU DevKit v1.0 (ESP-12E)** shows both 15-pin headers: D0–D8, RX/TX, A0, VIN, EN, RST, duplicate 3V3/GND, and the six SD/flash pads (visible but reserved). Each usable pad is a wire endpoint. GPIO uses 3.3 V logic; it is not 5 V tolerant and cannot directly power motors or servos. See the [open hardware design and pin map](https://github.com/nodemcu/nodemcu-devkit-v1.0).
 - **TowerPro SG90 analog servo** shows SIGNAL (orange), V+ (red), and GND (brown/black). Its rated supply is 4.8 V; connect controller and servo grounds together. The canvas does not decode the servo's timed control pulses or model its current draw.
 - **Battery packs** include Panasonic eneloop 2×AA (2.4 V), eneloop 4×AA (4.8 V), eneloop pro 4×AA (4.8 V, at least 2450 mAh), Energizer MAX E91 4×AA alkaline (6.0 V), and the Energizer 522 rectangular 9 V alkaline battery (PP3) with positive and negative snap terminals. Series packs add cell voltages; their mAh capacity does not multiply. Alkaline capacity varies with load. The 9 V block is intended for low-drain devices and is a poor choice for motors or servos. Do not connect any pack directly to NodeMCU 3V3.
 - **Kingbright WP7113ID red LED** has ANODE (+) and CATHODE (−). Use a series current limiting resistor; 220 Ω is a common starting value for a 3.3 V output at about 10 mA.

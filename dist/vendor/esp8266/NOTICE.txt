@@ -1,0 +1,20 @@
+ESP8266 firmware emulator attribution
+
+Xtensa LX106 CPU, SoC model, ROM high-level emulation, symbol definitions and
+Blink demo: emulators.org, public domain / CC0, retrieved 2026-11-24.
+Source and license declaration: https://emulators.org/emulator/esp8266/
+Original source: https://emulators.org/emulator/esp8266/src/
+
+Robot Canvas changes to xtensa-esp8266.js: external GPIO input mask/value support,
+including RTC GPIO16. The app supplies its own worker, loader, controls and terminal.
+
+Bundled MicroPython ESP8266_GENERIC v1.23.0 (2024-06-02), copyright Damien P.
+George and contributors, MIT. Original: https://micropython.org/download/ESP8266_GENERIC/
+https://github.com/micropython/micropython/tree/v1.23.0
+The image includes the ESP8266 NONOS SDK runtime; upstream redistribution and
+license notices are included in the MicroPython source tree and LICENSE file.
+
+Limits: approximate timing; no Wi-Fi packets, GPIO interrupts, PWM/FRC1 interrupt,
+ADC sampling, external I2C/SPI device emulation or watchdog. ADC reads a constant.
+Deep sleep does not resume. Generic Arduino/NodeMCU Lua firmware compatibility
+is unverified. Upload supports only ESP8266 v1 segmented images at flash offset 0.

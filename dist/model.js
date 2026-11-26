@@ -7,8 +7,9 @@ const RobotModel=(()=>{
  const unique=a=>new Set(a).size===a.length;
  const image=v=>typeof v==='string'&&v.length<=750000&&/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(v);
  function boardValid(b){return !!b&&id(b.id)&&text(b.name,60)&&image(b.image)&&Number.isInteger(b.width)&&b.width>0&&b.width<=1200&&Number.isInteger(b.height)&&b.height>0&&b.height<=1200&&(b.runtime===undefined||['logic','esp8266'].includes(b.runtime))&&Array.isArray(b.pins)&&b.pins.length>0&&b.pins.length<=64&&b.pins.every(p=>p&&id(p.id)&&text(p.name,32)&&kinds.includes(p.kind)&&(p.gpio==null||(Number.isInteger(p.gpio)&&p.gpio>=0&&p.gpio<=16&&['input','output'].includes(p.kind)))&&Number.isFinite(p.x)&&p.x>=0&&p.x<=1&&Number.isFinite(p.y)&&p.y>=0&&p.y<=1)&&unique(b.pins.map(p=>p.id))&&unique(b.pins.map(p=>p.name.trim().toLowerCase()))&&unique(b.pins.filter(p=>p.gpio!=null).map(p=>p.gpio))&&(b.runtime!=='esp8266'||b.pins.some(p=>p.gpio!=null))}
+ const pinPositionValid=p=>(p.x===undefined&&p.y===undefined)||(Number.isFinite(p.x)&&p.x>=0&&p.x<=1&&Number.isFinite(p.y)&&p.y>=0&&p.y<=1);
  const board=(s,n)=>s.boards?.find(b=>b.id===n.boardId);
- function pins(s,n){if(!n)return [];if(n.type==='board')return board(s,n)?.pins||[];const definition=ComponentRegistry.get(n.type);if(!definition)return [];if(n.type==='esp8266')return espPinDefs().map((p,i)=>({...p,kind:p.gpio!=null?(n.pinDirections?.[i]||p.kind):p.kind}));return ComponentRegistry.pins(n.type)}
+ function pins(s,n){if(!n)return [];if(n.type==='board')return board(s,n)?.pins||[];const definition=ComponentRegistry.get(n.type);if(!definition||!definition.pins.every(pinPositionValid))return [];if(n.type==='esp8266')return espPinDefs().map((p,i)=>({...p,kind:p.gpio!=null?(n.pinDirections?.[i]||p.kind):p.kind}));return ComponentRegistry.pins(n.type)}
  function pinIndex(pin){return pin==='in'?0:Number(pin)}
  function kind(s,n,pin){const index=pinIndex(pin);return Number.isInteger(index)?pins(s,n)[index]?.kind:undefined}
  const firmwareTarget=(s,n)=>n&&(n.type==='esp8266'||(n.type==='board'&&board(s,n)?.runtime==='esp8266'));

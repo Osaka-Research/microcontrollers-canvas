@@ -13,7 +13,7 @@ window.Wiring=(()=>{
   const direct=hit?.closest('#nodes button.pin');if(direct)return direct;
   const vr=viewport.getBoundingClientRect();if(x<vr.left||x>vr.right||y<vr.top||y>vr.bottom)return null;
   const radius=pointerType==='touch'?26:17;let nearest=null,best=radius;
-  for(const p of pins()){if(!RobotModel.connection(state,source,endpoint(p)))continue;const r=p.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;if(cx<vr.left||cx>vr.right||cy<vr.top||cy>vr.bottom)continue;const distance=Math.hypot(x-cx,y-cy);if(distance<best){nearest=p;best=distance}}
+  for(const p of pins()){if(!RobotModel.connection(state,source,endpoint(p)))continue;const anchor=p.querySelector('.connection-dot')||p,r=anchor.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;if(cx<vr.left||cx>vr.right||cy<vr.top||cy>vr.bottom)continue;const distance=Math.hypot(x-cx,y-cy);if(distance<best){nearest=p;best=distance}}
   return nearest;
  }
  function update(x,y){if(!gesture)return;const g=gesture;g.moved||=Math.hypot(x-g.startX,y-g.startY)>5;g.x=x;g.y=y;const target=targetAt(x,y,g.source,g.pointerType),connection=target&&RobotModel.connection(state,g.source,endpoint(target));g.target=target;g.valid=!!connection;

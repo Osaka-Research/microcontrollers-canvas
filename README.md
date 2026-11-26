@@ -17,15 +17,23 @@ Part ratings and connection notes are linked from each component inspector. The 
 
 The canvas is a digital learning model. It shows logic-level behavior and selected component responses, but does not simulate voltage, current, heat, battery capacity, LED current, motor drivers, or servo PWM.
 
+## AI circuit builder
+
+The canvas includes an AI chat panel. Enter an OpenAI API key, describe a project, and the server searches for relevant manufacturer references before returning a plan. The app validates every proposed component and connection against its library before adding it. The key is held in the current browser tab and sent to the server over HTTPS for each request; this project does not save it. OpenAI API usage is billed to the key's owner.
+
+The AI endpoint is `api/build.js`, deployed as a Vercel function with the static site in `dist/`. Deploy this repository to Vercel with the output directory set to `dist`; the function is available at `/api/build`. The GitHub Pages workflow serves static files only and cannot run this endpoint. To keep using GitHub Pages, set `window.CANVAS_AI_ENDPOINT` in `dist/ai-config.js` to the deployed server's HTTPS `/api/build` URL and set `CANVAS_ORIGIN` in the server deployment to `https://osaka-research.github.io`. If you use a custom Vercel domain, set `CANVAS_ORIGIN` to the exact site origin.
+
+Search results are shown as source links. The canvas uses its own component drawings rather than embedding product photos with unknown redistribution rights. The AI can build with parts already in the component library; it explains when a requested part or supporting component is missing.
+
 ## Run locally
 
-From this directory, serve the built app:
+For the full app, run the Vercel development server from this directory:
 
 ```sh
-python3 -m http.server 8000 --bind 0.0.0.0 --directory dist
+npx vercel dev
 ```
 
-Open `http://localhost:8000`, or use this device's LAN address and port 8000 from another device on the same network.
+Open the local URL shown by Vercel. Serving `dist/` with a basic static HTTP server works for the canvas editor, but it does not provide the AI endpoint.
 
 ## GitHub Pages
 

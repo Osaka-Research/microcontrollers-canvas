@@ -77,6 +77,26 @@ $('#toggleUI').onclick=()=>{
  if(hidden){pending=null;render()}
 };
 
+window.CanvasAI={
+ current(){return state.nodes.map((n,index)=>({index,id:n.id,type:n.type,label:componentLabel(n),pins:RobotModel.pins(state,n).map((p,pin)=>({pin,name:p.name,kind:p.kind}))}))},
+ apply(plan){
+  const allowed=new Set(['mcu','esp8266','led','motor','servo','battery','ultrasonic','motorDriver']);
+  const packs=new Set(['eneloop2','eneloop4','pro4','energizer4','nineVolt']);
+  if(!plan||!Array.isArray(plan.components)||!Array.isArray(plan.wires)||plan.components.length>20||plan.wires.length>60)throw Error('The proposed build is too large. Try a smaller idea.');
+  if(state.nodes.length+plan.components.length>150)throw Error('The canvas limit is 150 components. Remove a few parts first.');
+  if(plan.components.some(c=>!c||!allowed.has(c.type)||(c.type==='battery'&&!packs.has(c.pack))))throw Error('The plan included a part that is not in this canvas library.');
+  if(plan.components.filter(c=>c.type==='esp8266').length+state.nodes.filter(n=>RobotModel.firmwareTarget(state,n)).length>4)throw Error('This workspace supports up to four firmware boards per project.');
+  const rect=viewport.getBoundingClientRect(),startX=(rect.width/2-pan.x)/zoom-180,startY=(rect.height/2-pan.y)/zoom-100;
+  const additions=plan.components.map((c,i)=>({id:uid(),type:c.type,...(c.type==='battery'?{pack:c.pack}:{}),x:Math.round((startX+(i%3)*210)/10)*10,y:Math.round((startY+Math.floor(i/3)*180)/10)*10,modes:c.type==='esp8266'?RobotModel.espPins.map(()=> 'low'):c.type==='ultrasonic'?['low','low','low','low']:['blink','low','low','low'],period:1,...(c.type==='esp8266'?{firmware:{preset:'blink'}}:{})}));
+  const combined=[...state.nodes,...additions],newWires=[];
+  for(const w of plan.wires){if(!w||![w.aComponent,w.aPin,w.bComponent,w.bPin].every(Number.isInteger)||w.aComponent<0||w.bComponent<0||w.aComponent>=combined.length||w.bComponent>=combined.length)throw Error('The plan referred to a component or pin that does not exist.');const wire=RobotModel.connection({ ...state,nodes:combined },{id:combined[w.aComponent].id,pin:w.aPin},{id:combined[w.bComponent].id,pin:w.bPin});if(!wire)throw Error(`The suggested connection between ${componentLabel(combined[w.aComponent])} and ${componentLabel(combined[w.bComponent])} is not compatible with their pin types.`);if(state.wires.some(existing=>RobotModel.targetKey(existing)===RobotModel.targetKey(wire))||newWires.some(existing=>RobotModel.targetKey(existing)===RobotModel.targetKey(wire)))continue;newWires.push(wire)}
+  if(state.wires.length+newWires.length>600)throw Error('The canvas limit is 600 connections per project.');
+  const next={...state,nodes:combined,wires:[...state.wires,...newWires]};if(!RobotModel.valid(next))throw Error('The proposed build did not pass the canvas checks. Try describing a simpler circuit.');
+  if(additions.length||newWires.length){snapshot();state=next;selected=additions.at(-1)?.id||selected;pending=null;render()}
+  return {added:additions.length,connected:newWires.length};
+ }
+};
+
 function boardInspector(n){const b=boardFor(n);$('#inspectorContent').innerHTML=`<h2 class="inspect-name">${esc(b.name)}</h2><div class="inspect-type">Custom digital board · ${b.pins.length} pins</div>${b.pins.map((p,i)=>`<div class="signal-row"><label for="customMode${i}">${esc(p.name)}<small class="pin-kind">${p.kind}</small></label>${p.kind==='output'?`<select id="customMode${i}" data-mode="${i}" aria-label="${esc(p.name)} behavior">${['low','high','blink'].map(m=>`<option value="${m}" ${n.modes[i]===m?'selected':''}>${m==='blink'?'Pulse':m==='high'?'High':'Low'}</option>`).join('')}</select>`:p.kind==='input'?`<span data-board-reading="${i}">LOW</span>`:`<span>${p.kind==='power'?'HIGH':'LOW'}</span>`}</div>`).join('')}<label class="field-label" for="period">Pulse cycle: <span id="periodText">${n.period.toFixed(1)}</span>s</label><input class="range" id="period" type="range" min="0.2" max="5" step="0.1" value="${n.period}"><p class="inspect-help">Marked pins carry digital signals. Inputs show their received state; power and ground provide fixed High and Low. Firmware and electrical behavior are not emulated.</p><button class="remove-wire" id="editThisBoard">Edit board pins</button><button class="remove-wire" id="disconnectBoard">Disconnect all</button><button class="remove-wire" id="removeSelected">Remove component</button>`;
  document.querySelectorAll('[data-mode]').forEach(s=>s.onchange=()=>{snapshot();n.modes[+s.dataset.mode]=s.value;save();updateSignals()});$('#period').onpointerdown=()=>snapshot();$('#period').onkeydown=e=>{if(e.key.startsWith('Arrow'))snapshot()};$('#period').oninput=e=>{n.period=+e.target.value;$('#periodText').textContent=n.period.toFixed(1);save()};$('#editThisBoard').onclick=()=>window.openBoardEditor(b.id);$('#disconnectBoard').onclick=()=>{snapshot();state.wires=state.wires.filter(w=>w.from!==n.id&&w.to!==n.id);render()};$('#removeSelected').onclick=removeSelected;
 }

@@ -26,3 +26,11 @@ html,body{width:100%;height:100%;overflow:hidden}.app{display:block;height:100dv
 .generic-terminal.input .connection-dot{border-color:#c5a36c}
 .generic-terminal.reserved .connection-dot{border-color:#b6bdb8;background:#edf0ed}
 .generic-terminal.pin small{margin-left:auto}
+
+/* Keep long catalog labels inside the library sidebar. */
+.part{display:grid;grid-template-columns:36px minmax(0,1fr) auto;min-width:0;overflow:hidden}
+.part-art{width:36px;min-width:36px}
+.part>span:nth-child(2){min-width:0;overflow:hidden}
+.part strong{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere;line-height:1.3}
+.part small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.add{white-space:nowrap}

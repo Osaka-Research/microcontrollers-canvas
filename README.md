@@ -29,4 +29,6 @@ Open `http://localhost:8000`, or use this device's LAN address and port 8000 fro
 
 ## GitHub Pages
 
+Live site: [Microcontrollers Canvas](https://osaka-research.github.io/microcontrollers-canvas/).
+
 Pushes to `main` publish the `dist/` directory through the workflow in `.github/workflows/pages.yml`.

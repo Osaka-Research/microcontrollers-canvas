@@ -19,7 +19,7 @@ The canvas is a digital learning model. It shows logic-level behavior and select
 
 ## AI circuit builder
 
-The canvas includes an AI chat panel. Enter an OpenAI API key, describe a project, and the server searches for relevant manufacturer references before returning a plan. The app validates every proposed component and connection against its library before adding it. The key is held in the current browser tab and sent to the server over HTTPS for each request; this project does not save it. OpenAI API usage is billed to the key's owner.
+The canvas includes an AI chat panel with one input: paste an OpenAI API key first, and after the server confirms it works, use that same input to describe a project. The server searches for relevant manufacturer references before returning a plan. The app validates every proposed component and connection against its library before adding it. The key is held in the current browser tab and sent to the server over HTTPS for each request; this project does not save it. OpenAI API usage is billed to the key's owner.
 
 The AI endpoint is `api/build.js`, deployed as a Vercel function with the static site in `dist/`. Deploy this repository to Vercel with the output directory set to `dist`; the function is available at `/api/build`. The GitHub Pages workflow serves static files only and cannot run this endpoint. To keep using GitHub Pages, set `window.CANVAS_AI_ENDPOINT` in `dist/ai-config.js` to the deployed server's HTTPS `/api/build` URL and set `CANVAS_ORIGIN` in the server deployment to `https://osaka-research.github.io`. If you use a custom Vercel domain, set `CANVAS_ORIGIN` to the exact site origin.
 

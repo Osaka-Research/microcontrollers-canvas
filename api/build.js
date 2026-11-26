@@ -68,6 +68,18 @@ module.exports = async function build(req, res) {
   if (!body || typeof body !== 'object') return send(res, 400, { error: 'Send a JSON request.' }, cors);
   const { apiKey, idea, context, history = [] } = body;
   if (typeof apiKey !== 'string' || apiKey.length < 20 || apiKey.length > 300) return send(res, 400, { error: 'Enter a valid OpenAI API key.' }, cors);
+  if (body.action === 'check') {
+    try {
+      const check = await fetch('https://api.openai.com/v1/models/gpt-6-luna', { headers: { Authorization: `Bearer ${apiKey}` } });
+      if (check.ok) return send(res, 200, { valid: true }, cors);
+      if (check.status === 401) return send(res, 401, { error: 'OpenAI did not accept this API key.' }, cors);
+      if (check.status === 404) return send(res, 400, { error: 'This key cannot access the model used by the circuit builder.' }, cors);
+      return send(res, 502, { error: `OpenAI key check failed (${check.status}).` }, cors);
+    } catch {
+      return send(res, 502, { error: 'Could not reach OpenAI to check this key.' }, cors);
+    }
+  }
+  if (body.action && body.action !== 'build') return send(res, 400, { error: 'Unknown AI request action.' }, cors);
   if (typeof idea !== 'string' || !idea.trim() || idea.length > 30000) return send(res, 400, { error: 'Describe a circuit idea in 1,200 characters or less.' }, cors);
   if (!context || typeof context !== 'object' || JSON.stringify(context).length > 24000) return send(res, 400, { error: 'The current canvas context is too large.' }, cors);
   if (!Array.isArray(history) || history.length > 12 || history.some(m => !m || !['user', 'assistant'].includes(m.role) || typeof m.content !== 'string' || m.content.length > 1600)) return send(res, 400, { error: 'The chat history is invalid.' }, cors);

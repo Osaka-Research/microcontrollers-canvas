@@ -1,4 +1,6 @@
-const {test}=require('node:test');const assert=require('node:assert/strict');
+const {test}=require('node:test');
+require('../dist/component-registry.js').replace(require('../scripts/initial-component-catalog.cjs'));
+const assert=require('node:assert/strict');
 global.window=globalThis;
 require('../dist/vendor/esp8266/xtensa-esp8266.js');require('../dist/vendor/esp8266/rom-symbols.js');require('../dist/vendor/esp8266/rom8266.js');require('../dist/vendor/esp8266/firmware/blink.js');require('../dist/vendor/esp8266/firmware/micropython.js');const E=require('../dist/firmware-engine.js'),M=require('../dist/model.js');
 function until(m,condition,max=12000){for(let i=0;i<max&&!condition();i++){m.step(1024);m.sys.addUs(500)}assert.ok(condition(),'Firmware did not reach expected state')}

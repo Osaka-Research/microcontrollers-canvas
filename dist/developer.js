@@ -6,7 +6,7 @@ window.renderBoardLibrary=()=>{
  $('#customBoards').querySelectorAll('[data-board]').forEach(b=>b.onclick=()=>addBoard(b.dataset.board));
  $('#customBoards').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openBoardEditor(b.dataset.edit));
  $('#customBoards').querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{if(state.nodes.some(n=>n.boardId===b.dataset.remove))return toast('Remove this board’s canvas instances before deleting it from the library.');snapshot();state.boards=state.boards.filter(board=>board.id!==b.dataset.remove);render();toast('Board removed. Undo restores it.')});
- $('#libraryCount').textContent=5+state.boards.length;
+ $('#libraryCount').textContent=document.querySelectorAll('#componentLibrary .part').length+state.boards.length;
  if($('#search').value)$('#search').oninput({target:$('#search')});
 };
 window.openBoardEditor=(id)=>{

@@ -1,4 +1,6 @@
 const {test}=require('node:test');
+require('../dist/component-registry.js').replace(require('../scripts/initial-component-catalog.cjs'));
+
 const assert=require('node:assert/strict');
 const M=require('../dist/model.js');
 const board=()=>({id:'board1',name:'Demo board',image:'data:image/png;base64,aGVsbG8=',width:300,height:500,pins:[{id:'p0',name:'D1',kind:'output',x:.1,y:.2},{id:'p1',name:'RX',kind:'input',x:.8,y:.2},{id:'p2',name:'3V3',kind:'power',x:.1,y:.8},{id:'p3',name:'GND',kind:'ground',x:.8,y:.8}]});

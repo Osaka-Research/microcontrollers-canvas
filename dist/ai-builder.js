@@ -8,17 +8,21 @@
  main.append(panel);
  const keyStatus=$('#aiState'),disconnect=$('#aiDisconnect'),form=$('#aiForm'),prompt=$('#aiPrompt'),send=$('#aiSend'),messages=$('#aiMessages'),inputLabel=$('#aiInputLabel');
  let apiKey='',busy=false,history=[];
- const catalog=[['mcu','Virtual MCU'],['esp8266','NodeMCU ESP8266'],['battery','Battery packs'],['motorDriver','TB6612FNG motor driver'],['ultrasonic','HC-SR04 distance sensor'],['led','Kingbright WP7113ID red LED'],['motor','Pololu #1101 6 V gearmotor'],['servo','TowerPro SG90 analog servo']].map(([type,label])=>({type,label,pins:RobotModel.pins({boards:[]},{type}).map((p,pin)=>({pin,name:p.name,kind:p.kind})).filter(p=>p.kind!=='reserved')}));
  function addMessage(role,text,sources=[]){const el=document.createElement('div');el.className=`ai-message ${role}`;el.textContent=text;messages.append(el);if(role==='assistant'&&sources.length){const refs=document.createElement('div');refs.className='ai-sources';const label=document.createElement('strong');label.textContent='Research sources';refs.append(label);for(const source of sources.slice(0,5)){if(!source||typeof source.url!=='string'||!/^https:\/\//.test(source.url))continue;const a=document.createElement('a');a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=source.title||new URL(source.url).hostname;refs.append(a)}if(refs.childElementCount>1)messages.append(refs)}messages.scrollTop=messages.scrollHeight}
  function setConnected(){prompt.value='';prompt.type='text';prompt.placeholder='Describe a circuit idea…';inputLabel.textContent='Describe a circuit idea';keyStatus.textContent='API key works · Describe your circuit';disconnect.hidden=false;send.textContent='Build';send.setAttribute('aria-label','Build this idea');panel.classList.add('ai-ready');addMessage('assistant','Your key works. Describe a circuit and I’ll add the supported parts and connections.')}
  disconnect.onclick=()=>{apiKey='';history=[];prompt.value='';prompt.type='password';prompt.placeholder='Paste your OpenAI API key';inputLabel.textContent='OpenAI API key';keyStatus.textContent='Paste your API key to connect';disconnect.hidden=true;send.textContent='Connect';send.setAttribute('aria-label','Check API key');panel.classList.remove('ai-ready');addMessage('assistant','The API key was cleared from this tab. Paste a key to reconnect.')};
- function currentState(){return {components:window.CanvasAI.current(),catalog,batteryPacks:['eneloop2','eneloop4','pro4','energizer4','nineVolt'],connectionRules:'Only output-to-input, positive supply-to-power-input, and ground-to-ground connections are allowed.'}}
+ function currentState(){return {components:window.CanvasAI.current()}}
  async function ask(idea){
   const endpoint=window.CANVAS_AI_ENDPOINT||'/api/build';
   const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'build',apiKey,idea,context:currentState(),history:history.slice(-8)})});
   let data;try{data=await response.json()}catch{throw Error(response.status===404?'No AI server is deployed at this site. Deploy the project server or configure its HTTPS URL in dist/ai-config.js.':'The project server returned an unreadable response.')}
   if(!response.ok)throw Error(data?.error||`The project server could not complete this request (${response.status}).`);
   if(!data?.plan)throw Error('The project server did not return a build plan. Try describing the circuit more simply.');
+  if(Array.isArray(data.definitions)&&data.definitions.length){
+   const definitions=new Map(ComponentRegistry.all().map(def=>[def.id,def]));
+   for(const def of data.definitions)definitions.set(def.id,def);
+   window.refreshComponentRegistry([...definitions.values()]);
+  }
   const applied=window.CanvasAI.apply(data.plan);return {summary:data.plan.summary, ...applied,sources:Array.isArray(data.sources)?data.sources:[]};
  }
  async function checkKey(candidate){const endpoint=window.CANVAS_AI_ENDPOINT||'/api/build';const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'check',apiKey:candidate})});let data;try{data=await response.json()}catch{throw Error(response.status===404?'No AI server is deployed at this site. Configure its HTTPS URL in dist/ai-config.js.':'The project server returned an unreadable response.')};if(!response.ok||!data?.valid)throw Error(data?.error||`The project server could not check this key (${response.status}).`)}

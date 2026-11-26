@@ -19,7 +19,7 @@ window.Wiring=(()=>{
  function update(x,y){if(!gesture)return;const g=gesture;g.moved||=Math.hypot(x-g.startX,y-g.startY)>5;g.x=x;g.y=y;const target=targetAt(x,y,g.source,g.pointerType),connection=target&&RobotModel.connection(state,g.source,endpoint(target));g.target=target;g.valid=!!connection;
   for(const p of pins())p.classList.remove('wire-target','wire-invalid');if(target&&target!==g.element)target.classList.add(g.valid?'wire-target':'wire-invalid');
   const a=pinPoint(g.element),origin=world.getBoundingClientRect(),b=g.valid?pinPoint(target):{x:(x-origin.left)/zoom,y:(y-origin.top)/zoom};
-  const n=state.nodes.find(n=>n.id===g.source.id);preview.setAttribute('d',RobotModel.kind(state,n,g.source.pin)==='input'?wireCurve(b,a):wireCurve(a,b));preview.classList.toggle('snapped',g.valid);preview.classList.toggle('invalid',!!target&&!g.valid&&target!==g.element);
+  const n=state.nodes.find(n=>n.id===g.source.id);preview.setAttribute('d',!RobotModel.sourceKind(RobotModel.kind(state,n,g.source.pin))?wireCurve(b,a):wireCurve(a,b));preview.classList.toggle('snapped',g.valid);preview.classList.toggle('invalid',!!target&&!g.valid&&target!==g.element);
  }
  viewport.addEventListener('pointerdown',e=>{
   const pin=e.target.closest('#nodes button.pin');if(!pin||e.button!==0||e.isPrimary===false)return;e.preventDefault();e.stopImmediatePropagation();cancel();ignoreClickUntil=0;

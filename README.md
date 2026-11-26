@@ -23,7 +23,25 @@ The canvas includes an AI chat panel with one input: paste an OpenAI API key fir
 
 The AI endpoint is `api/build.js`, deployed as a Vercel function with the static site in `dist/`. Deploy this repository to Vercel with the output directory set to `dist`; the function is available at `/api/build`. The GitHub Pages workflow serves static files only and cannot run this endpoint. To keep using GitHub Pages, set `window.CANVAS_AI_ENDPOINT` in `dist/ai-config.js` to the deployed server's HTTPS `/api/build` URL and set `CANVAS_ORIGIN` in the server deployment to `https://osaka-research.github.io`. If you use a custom Vercel domain, set `CANVAS_ORIGIN` to the exact site origin.
 
+## Database-backed component catalog
+
+The browser does not bundle component definitions. It loads published records from `/api/components`; the server reads Supabase Postgres using `SUPABASE_URL` and `SUPABASE_SECRET_KEY`. Component images can use Supabase Storage paths in `assetPath`. Keep the secret key in the Vercel server environment only. The database migration is `supabase/migrations/20261126_component_catalog.sql`.
+
+To initialize a project, apply the migration in Supabase SQL Editor, then run `node scripts/seed-component-catalog.mjs` with `SUPABASE_URL` and a rotated Supabase secret key set in the local environment. The source records for this one-time seed are kept under `scripts/`; they are not loaded by the browser. Add and edit parts as records in `component_catalog`, and publish by setting `status` to `published`.
+
+When a user asks for a part missing from the catalog, `/api/build` searches the web, checks manufacturer references and image results, creates a generic part record with a pin map and source links, saves it to Postgres, and includes it in the current build. Later users load the saved record. New parts use the same generic image and pin layout, so adding a normal component does not require a frontend code change. New interactive simulation behavior still requires a separately implemented model.
+
+For images you have permission to redistribute, set `COMPONENT_IMAGE_ORIGIN` to their exact HTTPS origin to enable copying them into Storage. Other image sources are shown as reference links.
+
+The migration also creates `project_templates` for public or private circuit templates and `user_projects` for per-user builds. The editor currently saves projects in browser storage. Account-backed save, reopen, and template selection still need application support.
+
+The catalog endpoints require the Supabase database to be configured. The app includes no bundled production catalog fallback; if the database is unavailable, the component list stays empty and the server reports the configuration problem.
+
 Search results are shown as source links. The canvas uses its own component drawings rather than embedding product photos with unknown redistribution rights. The AI can build with parts already in the component library; it explains when a requested part or supporting component is missing.
+
+## Local verification
+
+Install the test dependencies with `npm install --prefix .qa --no-save jsdom@26 @electric-sql/pglite@0.6.0`, then run `node --test tests/*.test.cjs`. The database test applies the migration to an embedded PostgreSQL instance and uses local fixtures for the Supabase HTTP and OpenAI responses.
 
 ## Run locally
 
@@ -33,7 +51,7 @@ For the full app, run the Vercel development server from this directory:
 npx vercel dev
 ```
 
-Open the local URL shown by Vercel. Serving `dist/` with a basic static HTTP server works for the canvas editor, but it does not provide the AI endpoint.
+Open the local URL shown by Vercel. For a static-only host, configure the backend URL in `dist/ai-config.js` so the editor can load its catalog and send build requests.
 
 ## GitHub Pages
 

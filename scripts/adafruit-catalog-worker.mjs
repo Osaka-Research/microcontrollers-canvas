@@ -21,7 +21,7 @@ const ComponentRegistry = require('../dist/component-registry.js');
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const ARCHIVE = path.join(ROOT, '.research', 'adafruit');
 export const DEFAULT_PROVIDER = 'gemini';
-export const DEFAULT_MODEL = 'gemini-3.8-flash-low';
+export const DEFAULT_MODEL = 'gemini-4-neon-medium';
 export const DEFAULT_GEMINI_API_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_CODEX_MODEL = 'gpt-6-luna';
 export const PASSIVE_KINDS = new Set(['passive-signal', 'passive-power', 'passive-ground']);
@@ -441,10 +441,10 @@ export async function researchWithGemini({
   await writeFile(schemaPath, JSON.stringify(RESEARCH_SCHEMA));
   const prompt = `${buildPrompt(row)}
 
-Speed & tool rules (target under 30 seconds):
-1. Call read_file ONCE on ${photoPath} and at most 2 search_web calls (in parallel) to check the Adafruit product page / Learn Guide pinout.
+Speed & tool rules (target under 45 seconds):
+1. Call read_file ONCE on ${photoPath} and up to 3 search_web calls (in parallel) to verify the Adafruit product page and Learn Guide pinout page.
 2. NEVER call run_command, write_file, edit_file, or download GitHub/Eagle schematic files.
-3. Immediately return ONLY the structured JSON matching the schema (use manual_review if the exact pinout is not clear from the photo + search results).`;
+3. Immediately return ONLY the structured JSON matching the schema (use manual_review if the exact pinout cannot be verified from the photo + Learn Guide).`;
   const args = [
     '--model', model,
     '--sandbox',

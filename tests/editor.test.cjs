@@ -44,8 +44,15 @@ test('loading a catalog restores a saved circuit and draws wires to a database p
   assert.equal($('#wires').children.length,1);
   assert.equal(run('RobotModel.valid(state)'),true);
   assert.deepEqual(JSON.parse(w.localStorage.getItem('robot-canvas-v1')).wires,JSON.parse(saved).wires);
-  assert.equal($('#templatesDrawer').hidden,false);
   assert.equal($('#templateCount').textContent,'1');
+  $('#toggleTemplates').click();
+  assert.equal($('#templatesPanel').hidden,false);
+  assert.equal($('#controlsPanel').hidden,true);
+  assert.equal($('#toggleTemplates').getAttribute('aria-pressed'),'true');
+  assert.match($('#templateList').textContent,/Demo RC Car/);
+  $('#templateList .template-item').click();
+  assert.equal($('#projectName').value,'Demo RC Car');
+  assert.equal(run('state.nodes.length'),1);
  } finally { b.dom.window.close(); }
 });
 

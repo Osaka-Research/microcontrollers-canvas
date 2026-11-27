@@ -126,10 +126,22 @@ function setZoom(z,cx=viewport.clientWidth/2,cy=viewport.clientHeight/2){const n
 viewport.addEventListener('wheel',e=>{e.preventDefault();const r=viewport.getBoundingClientRect();setZoom(zoom*(e.deltaY>0?.9:1.1),e.clientX-r.left,e.clientY-r.top)},{passive:false});
 $('#zoomIn').onclick=()=>setZoom(zoom+.1);$('#zoomOut').onclick=()=>setZoom(zoom-.1);$('#resetView').onclick=()=>{zoom=1;if(state.nodes.length){const xs=state.nodes.map(n=>n.x),ys=state.nodes.map(n=>n.y);pan={x:viewport.clientWidth/2-(Math.min(...xs)+Math.max(...xs)+168)/2,y:viewport.clientHeight/2-(Math.min(...ys)+Math.max(...ys)+200)/2}}else pan={x:0,y:0};view()};
 initializeComponentLibrary();$('#componentLibrary').onclick=e=>{const b=e.target.closest('.part[data-type]');if(b)add(b.dataset.type,b.dataset.pack)};$('#start').onclick=()=>add('mcu');$('#delete').onclick=removeSelected;
-const componentHeading=document.querySelector('.library > .section-title');
+const componentHeading=document.querySelector('#controlsPanel > .section-title');
 const closeComponents=document.createElement('button');closeComponents.type='button';closeComponents.className='dock-close';closeComponents.id='closeComponents';closeComponents.textContent='×';closeComponents.setAttribute('aria-label','Close component list');componentHeading.append(closeComponents);
-function setComponentsOpen(open){document.body.classList.toggle('components-closed',!open);document.body.classList.toggle('components-open',open);$('#toggleComponents').setAttribute('aria-pressed',String(open))}
-closeComponents.onclick=()=>setComponentsOpen(false);
+let activeLeftPanel='components';
+function setLeftPanel(panel){
+ activeLeftPanel=panel;
+ document.body.classList.toggle('components-open',panel==='components');
+ document.body.classList.toggle('templates-open',panel==='templates');
+ document.body.classList.toggle('components-closed',!panel);
+ if($('#controlsPanel'))$('#controlsPanel').hidden=panel!=='components';
+ if($('#templatesPanel'))$('#templatesPanel').hidden=panel!=='templates';
+ $('#toggleComponents').setAttribute('aria-pressed',String(panel==='components'));
+ if($('#toggleTemplates'))$('#toggleTemplates').setAttribute('aria-pressed',String(panel==='templates'));
+}
+function setComponentsOpen(open){setLeftPanel(open?'components':null)}
+closeComponents.onclick=()=>setLeftPanel(null);
+if($('#closeTemplates'))$('#closeTemplates').onclick=()=>setLeftPanel(null);
 function setChatOpen(open){document.body.classList.toggle('chat-closed',!open);document.body.classList.toggle('chat-open',open);$('#toggleChat').setAttribute('aria-pressed',String(open))}
 window.setChatOpen=setChatOpen;
 const themeKey='microcontrollers-canvas-theme',themeMenu=$('#themeMenu'),themeButton=$('#themeButton');
@@ -138,7 +150,8 @@ try{setTheme(localStorage.getItem(themeKey)||'light',false)}catch{setTheme('ligh
 themeButton.onclick=e=>{e.stopPropagation();themeMenu.hidden=!themeMenu.hidden;themeButton.setAttribute('aria-expanded',String(!themeMenu.hidden))};
 themeMenu.onclick=e=>{const button=e.target.closest('[data-theme]');if(!button)return;setTheme(button.dataset.theme);themeMenu.hidden=true;themeButton.setAttribute('aria-expanded','false')};
 document.addEventListener('click',e=>{if(!e.target.closest('.theme-control')){themeMenu.hidden=true;themeButton.setAttribute('aria-expanded','false')}});
-$('#toggleComponents').onclick=()=>setComponentsOpen(document.body.classList.contains('components-closed'));
+$('#toggleComponents').onclick=()=>setLeftPanel(activeLeftPanel==='components'?null:'components');
+if($('#toggleTemplates'))$('#toggleTemplates').onclick=()=>setLeftPanel(activeLeftPanel==='templates'?null:'templates');
 $('#toggleChat').onclick=()=>setChatOpen(document.body.classList.contains('chat-closed'));
 function undo(){if(!history.length)return toast('Nothing to undo yet.');redoHistory.push(JSON.stringify(state));if(redoHistory.length>40)redoHistory.shift();state=JSON.parse(history.pop());selected=null;selectedWire=null;pending=null;render();toast('Change undone')}
 function redo(){if(!redoHistory.length)return toast('Nothing to redo yet.');history.push(JSON.stringify(state));if(history.length>40)history.shift();state=JSON.parse(redoHistory.pop());selected=null;selectedWire=null;pending=null;render();toast('Change redone')}
@@ -193,13 +206,37 @@ window.refreshComponentRegistry=definitions=>{
  render();
 };
 let loadedTemplates=[];
+function filterTemplates(){
+ const q=($('#templateSearch')?.value||'').trim().toLowerCase();
+ let visible=0;
+ document.querySelectorAll('#templateList .template-item').forEach(btn=>{
+  btn.hidden=!!q&&!btn.textContent.toLowerCase().includes(q);
+  if(!btn.hidden)visible++;
+ });
+ document.querySelectorAll('#templateList .category-group').forEach(group=>{
+  const count=group.querySelectorAll('.template-item:not([hidden])').length;
+  group.hidden=!count;
+  if(q&&count)group.open=true;
+ });
+ const empty=$('#noTemplates');
+ if(empty){
+  empty.textContent=loadedTemplates.length?'No matching templates found.':'No templates available yet. Run the template worker to generate starter circuits.';
+  empty.hidden=visible>0;
+ }
+}
+if($('#templateSearch'))$('#templateSearch').oninput=filterTemplates;
 window.refreshTemplates=templates=>{
  loadedTemplates=Array.isArray(templates)?templates:[];
- const drawer=$('#templatesDrawer'),list=$('#templateList'),count=$('#templateCount');
- if(!drawer||!list||!count)return;
- drawer.hidden=!loadedTemplates.length;
+ const list=$('#templateList'),count=$('#templateCount');
+ if(!list||!count)return;
  count.textContent=String(loadedTemplates.length);
- list.innerHTML=loadedTemplates.map((tpl,idx)=>`<button type="button" class="template-item" data-template-idx="${idx}" title="${esc(tpl.realWorldNotes||tpl.description||tpl.name)}"><strong>${esc(tpl.name)}</strong><small>${esc(tpl.category||'TEMPLATE')}${tpl.difficulty?' · '+esc(tpl.difficulty):''} · ${tpl.project?.nodes?.length||0} parts</small></button>`).join('');
+ const groups=new Map();
+ loadedTemplates.forEach((tpl,idx)=>{
+  const cat=tpl.category||'TEMPLATES';
+  if(!groups.has(cat))groups.set(cat,[]);
+  groups.get(cat).push({tpl,idx});
+ });
+ list.innerHTML=[...groups].map(([category,items])=>`<details class="category-group" open><summary class="category">${esc(category)} <span>${items.length}</span></summary>${items.map(({tpl,idx})=>`<button type="button" class="template-item" data-template-idx="${idx}" title="${esc(tpl.realWorldNotes||tpl.description||tpl.name)}"><div class="template-head"><strong>${esc(tpl.name)}</strong>${tpl.difficulty?`<span class="template-badge">${esc(tpl.difficulty)}</span>`:''}</div>${tpl.description?`<p class="template-desc">${esc(tpl.description)}</p>`:''}<small>${tpl.project?.nodes?.length||0} parts · ${tpl.project?.wires?.length||0} wires</small></button>`).join('')}</details>`).join('');
  list.querySelectorAll('[data-template-idx]').forEach(button=>button.onclick=()=>{
   const tpl=loadedTemplates[+button.dataset.templateIdx];
   if(!tpl?.project)return;
@@ -211,6 +248,7 @@ window.refreshTemplates=templates=>{
   render();$('#resetView').click();
   toast(tpl.realWorldNotes?`Loaded ${tpl.name}. ${tpl.realWorldNotes}`:`Loaded template: ${tpl.name}. Press Run simulation.`);
  });
+ filterTemplates();
 };
 window.CanvasAI={
  current(){return state.nodes.map((n,index)=>({index,id:n.id,type:n.type,label:componentLabel(n),pins:RobotModel.pins(state,n).map((p,pin)=>({pin,id:p.id,name:p.name,kind:p.kind})),conductors:ComponentRegistry.get(n.type)?.conductors}))},

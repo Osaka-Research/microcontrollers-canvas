@@ -233,16 +233,24 @@ main{position:relative;display:grid;grid-template-rows:minmax(0,1fr) 230px;min-w
 :root[data-theme="high-contrast"] .app>.inspector{background:#000;color:#fff;border-color:#fff}
 :root[data-theme="high-contrast"] .floating-tools,:root[data-theme="high-contrast"] .zoom,:root[data-theme="high-contrast"] .reading,:root[data-theme="high-contrast"] .remove-wire,:root[data-theme="high-contrast"] .connection-select,:root[data-theme="high-contrast"] .wire-context-delete,:root[data-theme="high-contrast"] .python-script{background:#000;color:#fff;border-color:#fff}
 
-/* Starter circuit templates drawer */
-.templates-drawer{margin:0 0 14px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:8px 10px}
-.templates-drawer>summary{list-style:none;cursor:pointer;user-select:none}
-.templates-drawer>summary::-webkit-details-marker{display:none}
-#templateList{display:grid;gap:6px;margin-top:10px}
-.template-item{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:7px;background:#fafcf9;padding:8px 9px}
-.template-item:hover{border-color:#9bbb9f;background:#f0f7f1}
-.template-item strong{display:block;font-size:11px;font-weight:600;line-height:1.3}
-.template-item small{display:block;font-size:9px;color:var(--muted);margin-top:3px}
-:root[data-theme="dark"] .templates-drawer{background:#2b2d2c;border-color:#454c48}
-:root[data-theme="dark"] .template-item{background:#252827;border-color:#424c45;color:#dbe4de}
-:root[data-theme="dark"] .template-item:hover{background:#303a34;border-color:#68a782}
-:root[data-theme="high-contrast"] .templates-drawer,:root[data-theme="high-contrast"] .template-item{background:#000;color:#fff;border-color:#fff}
+/* Dedicated Templates sidebar panel (toggled from left activity bar) */
+.components-open #templatesPanel{display:none}
+.templates-open #controlsPanel{display:none}
+.templates-open #templatesPanel{display:flex}
+@media(max-width:560px){
+ .templates-open #templatesPanel{display:flex}
+ .templates-open .floating-tools,.templates-open .zoom{opacity:.45}
+}
+#templateList{display:grid;gap:4px}
+.template-item{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px;margin-bottom:7px}
+.template-item:hover{border-color:#9bbb9f;background:#f4faf5}
+.template-head{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
+.template-item strong{display:block;font-size:11px;font-weight:600;line-height:1.35}
+.template-badge{flex:none;font-size:8px;padding:2px 6px;border-radius:4px;background:#edf5ef;color:#337d61;font-weight:600}
+.template-desc{margin:5px 0 6px;font-size:10px;line-height:1.45;color:var(--muted)}
+.template-item small{display:block;font-size:9px;color:#7f9185}
+:root[data-theme="dark"] .template-item{background:#2b2d2c;border-color:#454c48;color:#dbe4de}
+:root[data-theme="dark"] .template-item:hover{background:#333936;border-color:#68a782}
+:root[data-theme="dark"] .template-badge{background:#2c4034;color:#9de3b8}
+:root[data-theme="dark"] .template-item small{color:#9ca89f}
+:root[data-theme="high-contrast"] .template-item,:root[data-theme="high-contrast"] .template-badge{background:#000;color:#fff;border:1px solid #fff}

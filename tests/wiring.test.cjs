@@ -15,3 +15,28 @@ test('invalid drop, empty drop, Escape and pointer cancellation never change wir
 test('tap-to-connect remains available and rewiring an occupied input is undoable',()=>{const b=boot();try{const {run,pin,event,drag}=b;run("add('mcu');add('led')");const one=pin(0,'0',100,100),two=pin(0,'1',100,200),led=pin(1,'0',400,100);event(one(),'pointerdown',100,100);event(b.$('#viewport'),'pointerup',100,100);assert.ok(run('pending'));event(led(),'pointerdown',400,100);event(b.$('#viewport'),'pointerup',400,100);assert.equal(run('state.wires[0].pin'),0);drag(two,[100,200],[400,100]);assert.equal(run('state.wires.length'),1);assert.equal(run('state.wires[0].pin'),1);run('undo()');assert.equal(run('state.wires[0].pin'),0)}finally{b.dom.window.close()}});
 test('NodeMCU numbered input endpoints are drawn and independently wired',()=>{const b=boot();try{const {run,pin,drag,$}=b;run("add('mcu');addEsp8266();state.nodes[1].pinDirections=RobotModel.pins(state,state.nodes[1]).map(p=>p.kind);state.nodes[1].pinDirections[1]='input';render()");const out=pin(0,'0',100,100),out2=pin(0,'1',100,200);pin(1,'9',500,100);pin(1,'1',500,200);drag(out,[100,100],[500,100]);drag(out2,[100,200],[500,200]);assert.equal(run('state.wires.length'),2);assert.equal(run('state.wires[0].toPin'),9);assert.equal($('#wires').children.length,2);assert.match($('#wires path').getAttribute('d'),/500 100$/);run('state.nodes[0].modes[0]="high";started=true;updateSignals()');assert.ok($('#nodes .esp8266 button[data-pin="9"]').classList.contains('high'))}finally{b.dom.window.close()}});
 test('marked image-board pins can be dragged into a connection',()=>{const b=boot();try{const {run,pin,drag}=b;run(`state.boards=[{id:'imageboard',name:'Custom',image:'data:image/png;base64,aGVsbG8=',width:100,height:100,pins:[{id:'p0',name:'D0',kind:'output',x:.1,y:.1},{id:'p1',name:'D1',kind:'output',x:.1,y:.5}]}];addBoard('imageboard');add('led');`);const out=pin(0,'1',100,200);pin(1,'0',400,200);drag(out,[100,200],[400,200]);assert.equal(run('state.wires[0].pin'),1);assert.ok(run('RobotModel.valid(state)'))}finally{b.dom.window.close()}});
+
+test('named pass-through rows connect from either end and expose their paired contact', () => {
+ const b = boot();
+ try {
+  const cable = {
+   id:'cableFixture', name:'Cable fixture', renderer:'generic',
+   pins:['A','B'].map(id => ({id, name:id+' contact', kind:'passive-signal'})),
+   conductors:[['A','B']]
+  };
+  b.w.refreshComponentRegistry([...require('../scripts/initial-component-catalog.cjs'),cable]);
+  b.run("add('mcu');add('cableFixture');add('led')");
+  const output=b.pin(0,'0',100,100), endB=b.pin(1,'1',300,100);
+  const endA=b.pin(1,'0',300,150);
+  b.pin(2,'0',500,150);
+  assert.match(endB().textContent,/B contact/);
+  b.drag(endA,[300,150],[500,150]);
+  b.drag(output,[100,100],[300,100]);
+  assert.equal(b.run('state.wires.length'),2);
+  assert.equal(b.run('RobotModel.input(state,state.nodes[2],0,true,0)'),true);
+  b.run('selected=state.nodes[1].id;inspector()');
+  assert.match(b.$('#inspectorContent').textContent,/connected to B contact/);
+ } finally {
+  b.dom.window.close();
+ }
+});

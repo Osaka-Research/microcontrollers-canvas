@@ -13,3 +13,43 @@ test('pin reorder preserves connections and per-instance behavior by pin ID',()=
 test('removing or changing a wired pin disconnects it without misrouting',()=>{const s=project();s.wires=[{from:'custom',pin:0,to:'led'}];const next=board();next.pins[0].kind='input';M.replaceBoard(s,next);assert.equal(s.wires.length,0);const s2=project();s2.wires=[{from:'custom',pin:0,to:'led'}];const b=board();b.pins.shift();M.replaceBoard(s2,b);assert.equal(s2.wires.length,0);assert.ok(M.valid(s2))});
 test('reject malformed, unsafe, or ambiguous imported projects',()=>{const invalid=[null,{name:'bad',nodes:[null],wires:[]}];for(const change of [s=>s.boards[0].image='javascript:alert(1)',s=>s.boards[0].pins[0].x=1.1,s=>s.boards[0].pins[0].name='RX',s=>s.nodes[0].boardId='missing',s=>s.nodes[0].modes=[],s=>s.wires=[{from:'custom',pin:99,to:'led'}],s=>s.wires=[{from:'custom',pin:0,to:'led'},{from:'mcu',pin:0,to:'led'}]]){const s=project();change(s);invalid.push(s)}for(const s of invalid)assert.equal(M.valid(s),false)});
 test('export/import roundtrip preserves board artwork, pin locations and signals',()=>{const s=project();s.wires=[{from:'custom',pin:0,to:'led',toPin:0}];const restored=JSON.parse(JSON.stringify(s));assert.ok(M.valid(restored));assert.deepEqual(restored,s);assert.equal(M.input(restored,restored.nodes[1],0,true,0),true)});
+
+test('pass-through contacts carry a single compatible source in either direction', () => {
+ const registry = require('../dist/component-registry.js');
+ const original = registry.all();
+ const cable = {id:'testCable',name:'Test cable',renderer:'generic',pins:[],conductors:[]};
+ for (const kind of ['signal','power','ground']) {
+  const pair = ['A','B'].map(end => end+'-'+kind);
+  cable.conductors.push(pair);
+  cable.pins.push(...pair.map(id => ({id,name:id,kind:'passive-'+kind})));
+ }
+ try {
+  registry.replace([...original,cable]);
+  for (const reverse of [false,true]) {
+   const s=project();
+   s.nodes.push(node('a',cable.id),node('b',cable.id));
+   function join(a,i,b,j) {
+    const w=M.connection(s,{id:a,pin:i},{id:b,pin:j});
+    assert.ok(w);
+    s.wires.push(w);
+   }
+   const start=reverse?1:0,end=1-start;
+   join('led',0,'b',end);
+   join('b',start,'a',end);
+   assert.equal(M.input(s,s.nodes[1],0,true,0),false);
+   join('a',start,'custom',0);
+   assert.ok(M.valid(JSON.parse(JSON.stringify(s))));
+   assert.equal(M.input(s,s.nodes[1],0,true,0),true);
+   assert.equal(M.input(s,s.nodes[1],0,true,750),false);
+   assert.equal(M.connection(s,{id:'mcu',pin:1},{id:'b',pin:start}),null);
+   assert.equal(M.connection(s,{id:'custom',pin:2},{id:'a',pin:start}),null);
+   join('custom',3,'a',4);
+   join('a',5,'led',1);
+   assert.equal(M.driverLookup(s)(s.nodes[1],1).pin,3);
+   assert.equal(M.connection(s,{id:'a',pin:3},{id:'led',pin:1}),null);
+   s.wires.push({from:'mcu',pin:1,to:'b',toPin:start});
+   assert.equal(M.valid(s),false);
+  }
+  assert.throws(()=>registry.replace([{...cable,conductors:[['A-power','B-ground']]}]));
+ } finally { registry.replace(original); }
+});

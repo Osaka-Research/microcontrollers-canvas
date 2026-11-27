@@ -37,6 +37,17 @@ The migration also creates `project_templates` for public or private circuit tem
 
 The catalog endpoints require the Supabase database to be configured. The app includes no bundled production catalog fallback; if the database is unavailable, the component list stays empty and the server reports the configuration problem.
 
+Cable and pass-through shield definitions can group named terminals that are permanently connected by copper. Each group carries signal, positive supply, or ground in either direction. A group can feed multiple inputs from one source. The simulation follows digital levels and wiring continuity. USB protocol signaling and electrical ratings require the product documentation.
+
+### Local Adafruit staging catalog
+
+Adafruit's product feed and product images can be staged on-device before a catalog server is configured. Run `node scripts/fetch-adafruit-products.mjs`, `node scripts/normalize-adafruit-products.mjs`, then `node scripts/import-adafruit-local-db.mjs`. The source feed, 5,597 product images, review records, and SQLite database stay under the ignored `.research/adafruit/` directory. `catalog.sqlite` has a `component_catalog` table matching the server columns and an `adafruit_products` table retaining the source feed rows. Candidate records stay in `draft`; pin layouts must be researched against exact product documentation before publication. Run `node scripts/export-adafruit-local-catalog.mjs` to create a JSON export in the server's `component_catalog` row shape for later migration. Product photos remain local research references until redistribution rights are confirmed.
+
+Start the local canvas preview with `node scripts/serve-local-canvas.mjs` and open `http://127.0.0.1:4173`. It reads the local SQLite drafts and `.research/local-catalog.json`; the browser refreshes its component catalog every 15 seconds. The saved Adafruit Codex queue can be resumed with `python3 .research/adafruit/codex_product_queue.py`; newly completed, source-backed components appear in the canvas library automatically. The preview binds to localhost and does not upload catalog records or photos.
+
+To research terminal names with OpenAI Luna, run `python3 scripts/research-adafruit-pins.py` after importing the local SQLite catalog. The default processes one pending component. Use `--limit 10` for a batch, `--product-id ID` for a specific draft, or `--all` to process the entire pending Adafruit queue, starting with component candidates. The script uses your signed-in Codex CLI and attaches the same image the preview serves. Luna checks the exact product documentation and returns an ordered list of terminal IDs, display names, and electrical roles. Complete layouts appear in the local preview with clickable terminal names in the component block. Uncertain layouts stay in manual review and can be retried by ID.
+
+
 Search results are shown as source links. The canvas uses its own component drawings rather than embedding product photos with unknown redistribution rights. The AI can build with parts already in the component library; it explains when a requested part or supporting component is missing.
 
 ## Local verification

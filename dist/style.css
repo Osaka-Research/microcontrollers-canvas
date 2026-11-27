@@ -253,6 +253,12 @@ main{position:relative;display:grid;grid-template-rows:minmax(0,1fr) 230px;min-w
 .template-thumb-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:6px;font-size:16px;flex:none}
 .template-item small{display:block;font-size:9px;color:#7f9185}
 :root[data-theme="dark"] .template-thumb-img{background:#1f2321;border-color:#424c45}
+.generic-art.has-live-indicator{position:relative}
+.live-indicator{position:absolute;right:8px;bottom:6px;display:grid;place-items:center;padding:3px 5px;border-radius:6px;background:#ffffffdd;border:1px solid var(--line);box-shadow:0 2px 6px #18251d1a;pointer-events:none}
+.live-indicator .light{width:15px;height:15px;border-width:2px}
+.live-indicator .rotor{font-size:18px}
+.live-indicator .arm{width:24px;height:5px}
+:root[data-theme="dark"] .live-indicator{background:#252827dd;border-color:#454c48}
 :root[data-theme="dark"] .template-item{background:#2b2d2c;border-color:#454c48;color:#dbe4de}
 :root[data-theme="dark"] .template-item:hover{background:#333936;border-color:#68a782}
 :root[data-theme="dark"] .template-badge{background:#2c4034;color:#9de3b8}

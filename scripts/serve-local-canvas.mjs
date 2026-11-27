@@ -60,8 +60,13 @@ async function api(handler, req, res) {
 }
 
 async function localImage(id, res) {
-  if (!/^\d{1,8}\.jpg$/i.test(id)) return send(res, 404, { error: 'Image not found.' });
-  const imagePath = getReadDb().prepare('SELECT image_path FROM adafruit_products WHERE product_id = ?').get(id.slice(0, -4))?.image_path;
+  let imagePath;
+  if (id === 'nodemcu-v1.jpg') {
+    imagePath = '.research/adafruit/images/nodemcu-v1.jpg';
+  } else {
+    if (!/^\d{1,8}\.jpg$/i.test(id)) return send(res, 404, { error: 'Image not found.' });
+    imagePath = getReadDb().prepare('SELECT image_path FROM adafruit_products WHERE product_id = ?').get(id.slice(0, -4))?.image_path;
+  }
   if (!imagePath) return send(res, 404, { error: 'Image not found.' });
   const absolute = path.resolve(root, imagePath);
   if (!absolute.startsWith(dataDir + path.sep)) return send(res, 404, { error: 'Image not found.' });

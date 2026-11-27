@@ -49,7 +49,17 @@ Adafruit's product feed and product images can be staged on-device before a cata
 
 Start the local canvas preview with `npm install`, `npm run build:siwc`, then `npm start`; open `http://127.0.0.1:4173`. It reads the local SQLite drafts and `.research/local-catalog.json`; the browser refreshes its component catalog every 15 seconds. The saved Adafruit Codex queue can be resumed with `python3 .research/adafruit/codex_product_queue.py`; newly completed, source-backed components appear in the canvas library automatically. The preview binds to localhost and does not upload catalog records or photos.
 
-To research terminal names with OpenAI Luna, run `python3 scripts/research-adafruit-pins.py` after importing the local SQLite catalog. The default processes one pending component. Use `--limit 10` for a batch, `--product-id ID` for a specific draft, or `--all` to process the entire pending Adafruit queue, starting with component candidates. The script uses your signed-in Codex CLI and attaches the same image the preview serves. Luna checks the exact product documentation and returns an ordered list of terminal IDs, display names, and electrical roles. Complete layouts appear in the local preview with clickable terminal names in the component block. Uncertain layouts stay in manual review and can be retried by ID.
+To research terminal names continuously and add verified Adafruit components into the catalog automatically, run the Gemini-powered AI catalog worker:
+
+```sh
+npm run worker:adafruit:status                    # show ready / pending / manual_review counts
+npm run worker:adafruit -- --limit 10             # process 10 prioritized components via Gemini (agy CLI)
+npm run worker:adafruit                           # run continuously until all pending candidates are processed
+npm run worker:adafruit -- --model gemini-4-neon-medium --concurrency 2
+npm run worker:adafruit -- --provider gemini-api --publish-supabase  # use GEMINI_API_KEY and sync drafts to Supabase
+```
+
+The worker defaults to **Gemini** (`agy` CLI with `gemini-3.8-flash-low`, or `--provider gemini-api` with `GEMINI_API_KEY` and Google Search grounding), prioritizes active modern development boards and breakouts first, auto-skips obvious non-electronics (apparel, stickers, books, enclosures), validates every pin map and passive conductor group against MCC's component schema, writes verified components directly to `.research/adafruit/catalog.sqlite` (appearing in the local canvas automatically every 15 seconds), and supports graceful resume and exponential backoff on errors. For single-item inspection with Python, `python3 scripts/research-adafruit-pins.py` also remains available.
 
 
 Search results are shown as source links. The canvas uses its own component drawings rather than embedding product photos with unknown redistribution rights. The AI can build with parts already in the component library; it explains when a requested part or supporting component is missing.

@@ -5,7 +5,9 @@
   "description": "Local development runtime for Microcontrollers Canvas",
   "scripts": {
     "build:siwc": "npm run build --prefix vendor/siwc-local",
-    "start": "node scripts/serve-local-canvas.mjs"
+    "start": "node scripts/serve-local-canvas.mjs",
+    "worker:adafruit": "node scripts/adafruit-catalog-worker.mjs",
+    "worker:adafruit:status": "node scripts/adafruit-catalog-worker.mjs --status"
   },
   "dependencies": {
     "@siwc/local": "file:vendor/siwc-local"

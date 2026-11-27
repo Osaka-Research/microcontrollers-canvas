@@ -3,7 +3,7 @@
 const { validConductors } = require('../dist/component-registry');
 const { publishedCatalog, savePublishedCatalog } = require('./lib/catalog');
 function planSchema(catalog) {
-  const types = catalog.filter(def => def.id !== 'board').map(def => def.id);
+  const types = catalog.filter(def => def.id !== 'board' && def.enabled !== false).map(def => def.id);
   const packs = [...new Set(['', ...catalog.flatMap(def => (def.variants || []).map(v => v.id))])];
   return {
   type: 'object', additionalProperties: false,
@@ -178,7 +178,7 @@ module.exports = async function build(req, res) {
     const schema = planSchema(catalog);
     const trustedContext = {
       components: Array.isArray(context.components) ? context.components.slice(0, 150) : [],
-      catalog: catalog.filter(def => def.id !== 'board').map(def => ({ type: def.id, label: def.label || def.name, conductors: def.conductors, pins: def.pins.map((p, pin) => ({ pin, id: p.id, name: p.name, kind: p.kind })), variants: def.variants?.map(v => v.id) || [] })),
+      catalog: catalog.filter(def => def.id !== 'board' && def.enabled !== false).map(def => ({ type: def.id, label: def.label || def.name, conductors: def.conductors, pins: def.pins.map((p, pin) => ({ pin, id: p.id, name: p.name, kind: p.kind })), variants: def.variants?.map(v => v.id) || [] })),
       connectionRules: 'Bidirectional GPIO pins default to input for new parts. Set their pinDirections before wiring. Only output-to-input, positive supply-to-power-input, and ground-to-ground connections are allowed.'
     };
     const requestInput = [

@@ -22,7 +22,7 @@ test('template worker validates RobotModel rules, retries on safety warnings, an
         description: 'RC car with bad battery.',
         realWorldNotes: 'Use NiMH pack.',
         components: [
-          { type: 'mcu', pack: '', modes: ['high', 'high', 'low', 'high'], period: 1, distanceCm: 40, pinDirections: [] },
+          { type: 'esp8266', pack: '', modes: [], period: 1, distanceCm: 40, pinDirections: [] },
           { type: 'battery', pack: 'nineVolt', modes: [], period: 1, distanceCm: 40, pinDirections: [] },
           { type: 'motorDriver', pack: '', modes: [], period: 1, distanceCm: 40, pinDirections: [] },
           { type: 'motor', pack: '', modes: [], period: 1, distanceCm: 40, pinDirections: [] }
@@ -47,7 +47,7 @@ test('template worker validates RobotModel rules, retries on safety warnings, an
       description: 'Dual gearmotor RC car controlled via TB6612FNG H-bridge.',
       realWorldNotes: 'Real 2WD RC cars add a wireless receiver and separate logic/motor regulators.',
       components: [
-        { type: 'mcu', pack: '', modes: ['high', 'high', 'low', 'high'], period: 1, distanceCm: 40, pinDirections: [] },
+        { type: 'esp8266', pack: '', modes: [], period: 1, distanceCm: 40, pinDirections: [] },
         { type: 'battery', pack: 'eneloop4', modes: [], period: 1, distanceCm: 40, pinDirections: [] },
         { type: 'motorDriver', pack: '', modes: [], period: 1, distanceCm: 40, pinDirections: [] },
         { type: 'motor', pack: '', modes: [], period: 1, distanceCm: 40, pinDirections: [] },

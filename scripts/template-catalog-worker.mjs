@@ -35,16 +35,16 @@ export const TEMPLATE_IDEAS = [
     name: '2WD RC Car (Dual Motor Drive)',
     category: 'ROBOTICS',
     difficulty: 'Beginner',
-    keywords: ['motor', 'driver', 'esp32', 'feather', 'wifi', 'bluetooth', 'battery'],
-    prompt: 'Build a real-world 2WD RC car drive circuit using a microcontroller (mcu or esp8266), a TB6612FNG dual H-bridge motor driver, two 6V gearmotors (left & right wheels), and a 4xAA NiMH battery pack (eneloop4 or pro4, NOT 9V) powering VM/VCC with shared ground and STBY/PWMA/AIN1/AIN2/PWMB/BIN1/BIN2 wired so both motors run forward when simulation starts.'
+    keywords: ['motor', 'driver', 'esp32', 'feather', 'pico', 'wifi', 'bluetooth', 'battery'],
+    prompt: 'Build a real-world 2WD RC car drive circuit using a real microcontroller board from the catalog (such as an ESP32 Feather, Pico 2 W, or NodeMCU esp8266), a TB6612FNG dual H-bridge motor driver, two 6V gearmotors (left & right wheels), and a 4xAA NiMH battery pack (eneloop4 or pro4, NOT 9V) powering VM/VCC with shared ground and STBY/PWMA/AIN1/AIN2/PWMB/BIN1/BIN2 wired so both motors run when simulation starts.'
   },
   {
     id: 'obstacle-avoiding-rover',
     name: 'Obstacle-Avoiding Robot Rover',
     category: 'ROBOTICS',
     difficulty: 'Intermediate',
-    keywords: ['ultrasonic', 'servo', 'motor', 'driver', 'battery', 'rover'],
-    prompt: 'Build a classic obstacle-avoiding robot rover combining a controller (mcu), an HC-SR04 ultrasonic sensor mounted on an SG90 pan servo, a TB6612FNG motor driver, two gearmotors, and a 4xAA NiMH 4.8V battery pack with common ground. Do NOT wire 5V HC-SR04 ECHO directly into a 3.3V NodeMCU.'
+    keywords: ['ultrasonic', 'servo', 'motor', 'driver', 'battery', 'esp32', 'feather', 'pico'],
+    prompt: 'Build a classic obstacle-avoiding robot rover combining a real microcontroller board from the catalog (prefer a generic Feather/ESP32/Pico board — if using esp8266, do NOT wire 5V HC-SR04 ECHO directly into a 3.3V esp8266 input), an HC-SR04 ultrasonic sensor mounted on an SG90 pan servo, a TB6612FNG motor driver, two gearmotors, and a 4xAA NiMH 4.8V battery pack with common ground.'
   },
   {
     id: 'mini-drone-flight-core',
@@ -52,31 +52,31 @@ export const TEMPLATE_IDEAS = [
     category: 'AEROSPACE & DRONES',
     difficulty: 'Advanced',
     keywords: ['esp32', 'rp2040', 'feather', 'imu', 'gyro', 'accelerometer', 'gps', 'motor', 'driver', 'lipo', 'battery'],
-    prompt: 'Build a beginner-friendly educational mini quadcopter / drone flight controller wiring diagram using an ESP32/RP2040/MCU flight controller, dual TB6612FNG motor drivers driving 4 brushed drone motors (or 2 pairs), an IMU/sensor breakout if available in the catalog, and a suitable power source with shared ground. Clearly explain in realWorldNotes that real drones need ESCs/high-discharge LiPo packs and closed-loop PID stabilization.'
+    prompt: 'Build a beginner-friendly educational mini quadcopter / drone flight controller wiring diagram using an ESP32/RP2040/Feather flight controller, dual TB6612FNG motor drivers driving brushed drone motors, a GPS or IMU sensor breakout if available in the catalog, and a suitable power source with shared ground. Clearly explain in realWorldNotes that real drones need ESCs/high-discharge LiPo packs and closed-loop PID stabilization.'
   },
   {
     id: 'pan-tilt-camera-gimbal',
     name: 'Pan-Tilt Servo Gimbal',
     category: 'MECHATRONICS',
     difficulty: 'Beginner',
-    keywords: ['servo', 'battery', 'mcu', 'esp8266', 'feather', 'camera'],
-    prompt: 'Build a 2-axis pan-tilt servo gimbal using a microcontroller (mcu), two TowerPro SG90 servos (Pan and Tilt with different output modes like Pulse and High), and a 4xAA NiMH 4.8V battery pack (eneloop4) with shared ground.'
+    keywords: ['servo', 'battery', 'esp8266', 'esp32', 'feather', 'pico'],
+    prompt: 'Build a 2-axis pan-tilt servo gimbal using a real microcontroller board from the catalog (such as ESP32 Feather, Pico, or NodeMCU esp8266), two TowerPro SG90 servos (Pan and Tilt), and a 4xAA NiMH 4.8V battery pack (eneloop4) with shared ground.'
   },
   {
     id: 'smart-parking-sonar',
     name: 'Ultrasonic Parking Distance Sensor',
     category: 'SENSORS & IOT',
     difficulty: 'Beginner',
-    keywords: ['ultrasonic', 'led', 'mcu', 'battery', 'display'],
-    prompt: 'Build a garage parking distance indicator using a virtual MCU (mcu) sending a Pulse trigger to an HC-SR04 ultrasonic sensor, reading ECHO, powering the sensor from a 4xAA battery pack, and driving two status LEDs with shared ground.'
+    keywords: ['ultrasonic', 'led', 'esp32', 'feather', 'pico', 'battery', 'display'],
+    prompt: 'Build a garage parking distance indicator using a real microcontroller board from the catalog (use a Feather/ESP32/Pico board, NOT esp8266 directly on 5V ECHO), an HC-SR04 ultrasonic sensor, a 4xAA battery pack, and two status LEDs with shared ground.'
   },
   {
     id: 'robotic-arm-3dof',
     name: '3-DOF Robotic Arm Controller',
     category: 'ROBOTICS',
     difficulty: 'Intermediate',
-    keywords: ['servo', 'battery', 'mcu', 'pwm', 'pca9685'],
-    prompt: 'Build a 3-joint robotic arm (base, shoulder, gripper) using a microcontroller (mcu), three SG90 servos, a status LED, and a 4xAA eneloop pro 4.8V battery pack (pro4) with shared ground.'
+    keywords: ['servo', 'battery', 'esp32', 'feather', 'pico', 'pwm', 'pca9685'],
+    prompt: 'Build a 3-joint robotic arm (base, shoulder, gripper) using a real microcontroller board from the catalog (ESP32 Feather, Pico, or NodeMCU esp8266), three SG90 servos, a status LED, and a 4xAA eneloop pro 4.8V battery pack (pro4) with shared ground.'
   },
   {
     id: 'nodemcu-smart-door-latch',
@@ -91,16 +91,16 @@ export const TEMPLATE_IDEAS = [
     name: '3-Light Traffic Signal Controller',
     category: 'BASICS',
     difficulty: 'Beginner',
-    keywords: ['led', 'mcu', 'battery'],
-    prompt: 'Build a 3-LED traffic light controller using a virtual microcontroller (mcu) with D0 High, D1 Blink, D2 Low driving three LEDs, plus a battery pack ground reference sharing ground with all three LED cathodes.'
+    keywords: ['led', 'esp32', 'feather', 'pico', 'esp8266', 'battery'],
+    prompt: 'Build a 3-LED traffic light controller using a real microcontroller board from the catalog (such as ESP32 Feather, Pico 2 W, or NodeMCU esp8266) driving three LEDs, plus a shared ground connecting all three LED cathodes to the controller GND.'
   },
   {
     id: 'dual-cell-series-flashlight',
     name: 'Dual-Cell Series Power & Indicator',
     category: 'POWER & BASICS',
     difficulty: 'Beginner',
-    keywords: ['battery', 'cell', 'cr2032', 'led', 'mcu'],
-    prompt: 'Build an educational series battery pack circuit connecting two identical 2xAA eneloop NiMH packs (eneloop2, 2.4V each -> 4.8V series) in series (Cell 1 + to Cell 2 -) powering a servo and controlled by an MCU with shared ground.'
+    keywords: ['battery', 'cell', 'cr2032', 'led', 'esp32', 'feather', 'esp8266'],
+    prompt: 'Build an educational series battery pack circuit connecting two identical 2xAA eneloop NiMH packs (eneloop2, 2.4V each -> 4.8V series) in series (Cell 1 + to Cell 2 -) powering an SG90 servo controlled by a real microcontroller board (ESP32 Feather or NodeMCU esp8266) with shared ground.'
   },
   {
     id: 'gps-telemetry-tracker',
@@ -108,7 +108,7 @@ export const TEMPLATE_IDEAS = [
     category: 'SENSORS & IOT',
     difficulty: 'Intermediate',
     keywords: ['gps', 'esp32', 'feather', 'pico', 'oled', 'lipo', 'battery', 'led'],
-    prompt: 'Build a portable GPS telemetry tracker using a microcontroller board from the catalog (such as ESP32/Feather/Pico or NodeMCU), a GPS breakout from the catalog if available (like Adafruit Ultimate GPS), a status LED, and a suitable battery pack with shared ground.'
+    prompt: 'Build a portable GPS telemetry tracker using a real microcontroller board from the catalog (such as ESP32/Feather/Pico or NodeMCU), a GPS breakout from the catalog if available (like Adafruit Ultimate GPS), a status LED, and a suitable battery pack with shared ground.'
   },
   {
     id: 'weather-station-node',
@@ -123,8 +123,8 @@ export const TEMPLATE_IDEAS = [
     name: 'Line-Following 2WD Robot',
     category: 'ROBOTICS',
     difficulty: 'Intermediate',
-    keywords: ['motor', 'driver', 'ir', 'reflectance', 'optical', 'sensor', 'battery', 'mcu'],
-    prompt: 'Build a differential-drive line-following robot with a microcontroller, TB6612FNG dual motor driver, left and right 6V gearmotors, an IR/optical sensor breakout from the catalog if available (or status LEDs indicating left/right turn), and 4xAA NiMH battery supply with common ground.'
+    keywords: ['motor', 'driver', 'ir', 'reflectance', 'optical', 'sensor', 'battery', 'esp32', 'feather', 'pico'],
+    prompt: 'Build a differential-drive line-following robot with a real microcontroller board from the catalog (ESP32 Feather, Pico, or NodeMCU), TB6612FNG dual motor driver, left and right 6V gearmotors, an IR/optical sensor breakout from the catalog if available (or status LEDs indicating left/right turn), and 4xAA NiMH battery supply with common ground.'
   },
   {
     id: 'portable-synth-audio-badge',
@@ -132,23 +132,23 @@ export const TEMPLATE_IDEAS = [
     category: 'AUDIO & WEARABLES',
     difficulty: 'Intermediate',
     keywords: ['audio', 'speaker', 'i2s', 'amp', 'neopixel', 'led', 'feather', 'pico', 'esp32', 'battery'],
-    prompt: 'Build a portable interactive audio/LED badge using a microcontroller from the catalog, an audio/speaker breakout from the catalog if available, status LEDs, and battery power with common ground.'
+    prompt: 'Build a portable interactive audio/LED badge using a real microcontroller from the catalog, an audio/speaker breakout from the catalog if available, status LEDs, and battery power with common ground.'
   },
   {
     id: 'automated-greenhouse-controller',
     name: 'Automated Greenhouse Controller',
     category: 'SMART HOME',
     difficulty: 'Intermediate',
-    keywords: ['soil', 'moisture', 'temp', 'humidity', 'relay', 'servo', 'motor', 'driver', 'pump', 'battery', 'esp32', 'mcu'],
-    prompt: 'Build an automated greenhouse vent & pump controller using a microcontroller, a servo for vent opening, a TB6612FNG driver + motor representing a small water pump, an environmental sensor if available in the catalog, and a 4xAA NiMH supply with shared ground.'
+    keywords: ['soil', 'moisture', 'temp', 'humidity', 'relay', 'servo', 'motor', 'driver', 'pump', 'battery', 'esp32', 'feather'],
+    prompt: 'Build an automated greenhouse vent & pump controller using a real microcontroller board from the catalog, a servo for vent opening, a TB6612FNG driver + motor representing a small water pump, an environmental sensor if available in the catalog, and a 4xAA NiMH supply with shared ground.'
   },
   {
     id: 'autonomous-turret-tracker',
     name: 'Ultrasonic Radar Scanner',
     category: 'ROBOTICS',
     difficulty: 'Intermediate',
-    keywords: ['ultrasonic', 'servo', 'led', 'mcu', 'battery', 'display'],
-    prompt: 'Build a sweeping ultrasonic radar scanner using a microcontroller (mcu), an SG90 sweep servo (Pulse), an HC-SR04 ultrasonic module (TRIG Pulsed), a target-alert LED, and a 4xAA 4.8V NiMH pack with shared ground.'
+    keywords: ['ultrasonic', 'servo', 'led', 'esp32', 'feather', 'pico', 'battery', 'display'],
+    prompt: 'Build a sweeping ultrasonic radar scanner using a real microcontroller board from the catalog (Feather/ESP32/Pico — not esp8266 directly on 5V ECHO), an SG90 sweep servo, an HC-SR04 ultrasonic module, a target-alert LED, and a 4xAA 4.8V NiMH pack with shared ground.'
   }
 ];
 
@@ -222,7 +222,7 @@ export function ensureTemplatesTable(db) {
 }
 
 export function loadLocalCatalog(db) {
-  const byId = new Map(initialCatalog.map(def => [def.id, structuredClone(def)]));
+  const byId = new Map(initialCatalog.filter(def => def.enabled !== false).map(def => [def.id, structuredClone(def)]));
   try {
     const rows = db.prepare(`
       SELECT definition FROM component_catalog
@@ -242,7 +242,7 @@ export function loadLocalCatalog(db) {
 }
 
 export function selectRelevantCatalog(catalog, keywords = [], maxExtras = 14) {
-  const coreIds = new Set(initialCatalog.map(def => def.id));
+  const coreIds = new Set(initialCatalog.filter(def => def.enabled !== false).map(def => def.id));
   const core = catalog.filter(def => coreIds.has(def.id));
   const lowered = keywords.map(k => k.toLowerCase());
   const extras = catalog

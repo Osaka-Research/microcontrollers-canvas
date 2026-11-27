@@ -5,6 +5,7 @@ import { access, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { chatgpt } from './chatgpt-local.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
@@ -87,7 +88,28 @@ async function staticFile(pathname, res) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
   if (url.pathname === '/api/components') return api(componentsHandler, req, res);
-  if (url.pathname === '/api/build') return api(buildHandler, req, res);
+  if (url.pathname === '/api/build') { req.chatgpt = chatgpt; return api(buildHandler, req, res); }
+  if (url.pathname === '/api/chatgpt/session' && req.method === 'GET') {
+    try { return send(res, 200, { session: await chatgpt.getSession(), localOnly: true }); }
+    catch { return send(res, 503, { error: 'ChatGPT sign-in is unavailable on this device.' }); }
+  }
+  if (url.pathname === '/api/chatgpt/models' && req.method === 'GET') {
+    try {
+      const session = await chatgpt.getSession();
+      if (!session.sharing) return send(res, 401, { error: 'Connect ChatGPT and allow plan usage first.' });
+      return send(res, 200, { models: await chatgpt.listModels() });
+    } catch { return send(res, 502, { error: 'Could not load models for this ChatGPT account.' }); }
+  }
+  if (url.pathname === '/api/chatgpt/sign-in' && req.method === 'POST') {
+    try {
+      const session = await chatgpt.signIn();
+      return send(res, session.sharing ? 200 : 403, { session, error: session.sharing ? undefined : 'Enable ChatGPT plan usage in the sign-in consent screen to use this account here.' });
+    } catch (error) { return send(res, 400, { error: error instanceof Error ? error.message : 'ChatGPT sign-in did not complete.' }); }
+  }
+  if (url.pathname === '/api/chatgpt/disconnect' && req.method === 'POST') {
+    try { await chatgpt.disconnect(); return send(res, 200, { session: await chatgpt.getSession() }); }
+    catch { return send(res, 502, { error: 'Could not disconnect this ChatGPT account.' }); }
+  }
   if (url.pathname === '/local-assets/' + path.basename(url.pathname)) return localImage(path.basename(url.pathname), res);
   if (url.pathname === '/healthz') {
     try {

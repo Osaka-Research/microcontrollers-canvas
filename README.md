@@ -1,4 +1,4 @@
-# Microcontrollers Canvas
+# MCC — Microcontrollers Canvas
 
 A browser based canvas for connecting real microcontroller pins to recognizable components and exploring simple digital behavior. It is designed to explain physical connections in plain language.
 
@@ -19,7 +19,11 @@ The canvas is a digital learning model. It shows logic-level behavior and select
 
 ## AI circuit builder
 
-The canvas includes an AI chat panel with one input: paste an OpenAI API key first, and after the server confirms it works, use that same input to describe a project. The server searches for relevant manufacturer references before returning a plan. The app validates every proposed component and connection against its library before adding it. The key is held in the current browser tab and sent to the server over HTTPS for each request; this project does not save it. OpenAI API usage is billed to the key's owner.
+The AI chat supports an OpenAI API key or ChatGPT plan sign-in. API keys stay in the current tab and are sent to the server over HTTPS for each request; the app does not save them. OpenAI API usage is billed separately from a ChatGPT plan.
+
+ChatGPT plan sign-in is available in the local MCC app only. Install dependencies, build the bundled `@siwc/local` runtime, then run `npm start` and open `http://127.0.0.1:4173`. Credentials are encrypted with the Android Keystore and stored under `~/.config/mcc/chatgpt`. This integration uses OpenAI's Sign in with ChatGPT DevKit, distributed under its Noncommercial License; see `vendor/siwc-local/LICENSE`.
+
+The GitHub Pages app keeps the API-key option. Hosted ChatGPT plan use is disabled until OpenAI approves remote use. Request access with the [Sign in with ChatGPT interest form](https://openai.com/form/sign-in-with-chatgpt-interest/), then provide the approved OAuth configuration and server-side protected token storage. The server searches relevant manufacturer references when the selected model and account allow web search; the app validates each build plan against its component and pin rules before applying it.
 
 The AI endpoint is `api/build.js`, deployed as a Vercel function with the static site in `dist/`. Deploy this repository to Vercel with the output directory set to `dist`; the function is available at `/api/build`. The GitHub Pages workflow serves static files only and cannot run this endpoint. To keep using GitHub Pages, set `window.CANVAS_AI_ENDPOINT` in `dist/ai-config.js` to the deployed server's HTTPS `/api/build` URL and set `CANVAS_ORIGIN` in the server deployment to `https://osaka-research.github.io`. If you use a custom Vercel domain, set `CANVAS_ORIGIN` to the exact site origin.
 
@@ -43,7 +47,7 @@ Cable and pass-through shield definitions can group named terminals that are per
 
 Adafruit's product feed and product images can be staged on-device before a catalog server is configured. Run `node scripts/fetch-adafruit-products.mjs`, `node scripts/normalize-adafruit-products.mjs`, then `node scripts/import-adafruit-local-db.mjs`. The source feed, 5,597 product images, review records, and SQLite database stay under the ignored `.research/adafruit/` directory. `catalog.sqlite` has a `component_catalog` table matching the server columns and an `adafruit_products` table retaining the source feed rows. Candidate records stay in `draft`; pin layouts must be researched against exact product documentation before publication. Run `node scripts/export-adafruit-local-catalog.mjs` to create a JSON export in the server's `component_catalog` row shape for later migration. Product photos remain local research references until redistribution rights are confirmed.
 
-Start the local canvas preview with `node scripts/serve-local-canvas.mjs` and open `http://127.0.0.1:4173`. It reads the local SQLite drafts and `.research/local-catalog.json`; the browser refreshes its component catalog every 15 seconds. The saved Adafruit Codex queue can be resumed with `python3 .research/adafruit/codex_product_queue.py`; newly completed, source-backed components appear in the canvas library automatically. The preview binds to localhost and does not upload catalog records or photos.
+Start the local canvas preview with `npm install`, `npm run build:siwc`, then `npm start`; open `http://127.0.0.1:4173`. It reads the local SQLite drafts and `.research/local-catalog.json`; the browser refreshes its component catalog every 15 seconds. The saved Adafruit Codex queue can be resumed with `python3 .research/adafruit/codex_product_queue.py`; newly completed, source-backed components appear in the canvas library automatically. The preview binds to localhost and does not upload catalog records or photos.
 
 To research terminal names with OpenAI Luna, run `python3 scripts/research-adafruit-pins.py` after importing the local SQLite catalog. The default processes one pending component. Use `--limit 10` for a batch, `--product-id ID` for a specific draft, or `--all` to process the entire pending Adafruit queue, starting with component candidates. The script uses your signed-in Codex CLI and attaches the same image the preview serves. Luna checks the exact product documentation and returns an ordered list of terminal IDs, display names, and electrical roles. Complete layouts appear in the local preview with clickable terminal names in the component block. Uncertain layouts stay in manual review and can be retried by ID.
 
@@ -66,6 +70,6 @@ Open the local URL shown by Vercel. For a static-only host, configure the backen
 
 ## GitHub Pages
 
-Live site: [Microcontrollers Canvas](https://osaka-research.github.io/microcontrollers-canvas/).
+Live site: [MCC — Microcontrollers Canvas](https://osaka-research.github.io/microcontrollers-canvas/).
 
 Pushes to `main` publish the `dist/` directory through the workflow in `.github/workflows/pages.yml`.

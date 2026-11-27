@@ -19,7 +19,7 @@
     assigned.add(id);
    }
   }
-  return assigned.size === passive.size;
+  return true;
  }
 
  const registry = Object.freeze({

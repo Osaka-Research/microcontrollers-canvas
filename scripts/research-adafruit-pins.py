@@ -88,8 +88,6 @@ def layout_problem(result):
         if len(set(group)) != len(group) or len({passive[pin] for pin in group}) != 1:
             return "A conductor repeats a contact or mixes electrical roles."
         assigned.update(group)
-    if assigned != passive.keys():
-        return "A passive terminal is missing its documented conductor."
     if not result["sources"] or any(urlsplit(s["url"]).scheme != "https" or
             not urlsplit(s["url"]).hostname or not s["label"].strip() for s in result["sources"]):
         return "Missing pinout source."

@@ -192,6 +192,7 @@ window.addEventListener('resize',drawWires);document.fonts?.ready.then(drawWires
 window.refreshComponentRegistry=definitions=>{
  ComponentRegistry.replace(definitions);
  buildComponentLibrary();
+ if(loadedTemplates.length)renderTemplates();
  $('#noResults').textContent='No components found.';
  $('#search').oninput({target:$('#search')});
  if(pendingRestore){
@@ -225,8 +226,17 @@ function filterTemplates(){
  }
 }
 if($('#templateSearch'))$('#templateSearch').oninput=filterTemplates;
-window.refreshTemplates=templates=>{
- loadedTemplates=Array.isArray(templates)?templates:[];
+function templateThumbsHTML(tpl){
+ const types=[...new Set((tpl.project?.nodes||[]).map(n=>n.type))];
+ const thumbs=types.slice(0,5).map(type=>{
+  const def=ComponentRegistry.get(type);
+  if(def?.visual?.assetUrl)return `<img class="template-thumb-img" src="${esc(def.visual.assetUrl)}" alt="${esc(def.name||type)}" loading="lazy">`;
+  const icon=catalogIcon(def||{});
+  return `<span class="template-thumb-icon ${icon.style}" title="${esc(def?.name||type)}" aria-hidden="true">${esc(icon.symbol)}</span>`;
+ }).join('');
+ return thumbs?`<div class="template-thumbs">${thumbs}</div>`:'';
+}
+function renderTemplates(){
  const list=$('#templateList'),count=$('#templateCount');
  if(!list||!count)return;
  count.textContent=String(loadedTemplates.length);
@@ -236,7 +246,7 @@ window.refreshTemplates=templates=>{
   if(!groups.has(cat))groups.set(cat,[]);
   groups.get(cat).push({tpl,idx});
  });
- list.innerHTML=[...groups].map(([category,items])=>`<details class="category-group" open><summary class="category">${esc(category)} <span>${items.length}</span></summary>${items.map(({tpl,idx})=>`<button type="button" class="template-item" data-template-idx="${idx}" title="${esc(tpl.realWorldNotes||tpl.description||tpl.name)}"><div class="template-head"><strong>${esc(tpl.name)}</strong>${tpl.difficulty?`<span class="template-badge">${esc(tpl.difficulty)}</span>`:''}</div>${tpl.description?`<p class="template-desc">${esc(tpl.description)}</p>`:''}<small>${tpl.project?.nodes?.length||0} parts · ${tpl.project?.wires?.length||0} wires</small></button>`).join('')}</details>`).join('');
+ list.innerHTML=[...groups].map(([category,items])=>`<details class="category-group" open><summary class="category">${esc(category)} <span>${items.length}</span></summary>${items.map(({tpl,idx})=>`<button type="button" class="template-item" data-template-idx="${idx}" title="${esc(tpl.realWorldNotes||tpl.description||tpl.name)}">${templateThumbsHTML(tpl)}<div class="template-head"><strong>${esc(tpl.name)}</strong>${tpl.difficulty?`<span class="template-badge">${esc(tpl.difficulty)}</span>`:''}</div>${tpl.description?`<p class="template-desc">${esc(tpl.description)}</p>`:''}<small>${tpl.project?.nodes?.length||0} parts · ${tpl.project?.wires?.length||0} wires</small></button>`).join('')}</details>`).join('');
  list.querySelectorAll('[data-template-idx]').forEach(button=>button.onclick=()=>{
   const tpl=loadedTemplates[+button.dataset.templateIdx];
   if(!tpl?.project)return;
@@ -249,6 +259,10 @@ window.refreshTemplates=templates=>{
   toast(tpl.realWorldNotes?`Loaded ${tpl.name}. ${tpl.realWorldNotes}`:`Loaded template: ${tpl.name}. Press Run simulation.`);
  });
  filterTemplates();
+}
+window.refreshTemplates=templates=>{
+ loadedTemplates=Array.isArray(templates)?templates:[];
+ renderTemplates();
 };
 window.CanvasAI={
  current(){return state.nodes.map((n,index)=>({index,id:n.id,type:n.type,label:componentLabel(n),pins:RobotModel.pins(state,n).map((p,pin)=>({pin,id:p.id,name:p.name,kind:p.kind})),conductors:ComponentRegistry.get(n.type)?.conductors}))},

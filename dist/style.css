@@ -248,7 +248,11 @@ main{position:relative;display:grid;grid-template-rows:minmax(0,1fr) 230px;min-w
 .template-item strong{display:block;font-size:11px;font-weight:600;line-height:1.35}
 .template-badge{flex:none;font-size:8px;padding:2px 6px;border-radius:4px;background:#edf5ef;color:#337d61;font-weight:600}
 .template-desc{margin:5px 0 6px;font-size:10px;line-height:1.45;color:var(--muted)}
+.template-thumbs{display:flex;align-items:center;gap:5px;margin-bottom:7px;overflow:hidden}
+.template-thumb-img{width:34px;height:34px;object-fit:contain;border:1px solid var(--line);border-radius:6px;background:#f7f8f5;padding:2px;flex:none}
+.template-thumb-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:6px;font-size:16px;flex:none}
 .template-item small{display:block;font-size:9px;color:#7f9185}
+:root[data-theme="dark"] .template-thumb-img{background:#1f2321;border-color:#424c45}
 :root[data-theme="dark"] .template-item{background:#2b2d2c;border-color:#454c48;color:#dbe4de}
 :root[data-theme="dark"] .template-item:hover{background:#333936;border-color:#68a782}
 :root[data-theme="dark"] .template-badge{background:#2c4034;color:#9de3b8}

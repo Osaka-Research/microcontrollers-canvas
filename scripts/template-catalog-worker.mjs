@@ -233,6 +233,9 @@ export function loadLocalCatalog(db) {
     for (const row of rows) {
       const def = JSON.parse(row.definition);
       if (def?.id && Array.isArray(def.pins) && def.pins.length > 0 && ComponentRegistry.validConductors(def)) {
+        const localPath = def.localImagePath || def.visual?.assetUrl || '';
+        const match = String(localPath).match(/(?:images(?:-cropped)?\/)?(\d+)\.jpg$/);
+        if (match) def.visual = { ...(def.visual || {}), assetUrl: `/local-assets/${match[1]}.jpg` };
         def.enabled = true;
         byId.set(def.id, def);
       }
@@ -241,7 +244,7 @@ export function loadLocalCatalog(db) {
   return [...byId.values()];
 }
 
-export function selectRelevantCatalog(catalog, keywords = [], maxExtras = 14) {
+export function selectRelevantCatalog(catalog, keywords = [], maxExtras = 24) {
   const coreIds = new Set(initialCatalog.filter(def => def.enabled !== false).map(def => def.id));
   const core = catalog.filter(def => coreIds.has(def.id));
   const lowered = keywords.map(k => k.toLowerCase());
@@ -249,10 +252,10 @@ export function selectRelevantCatalog(catalog, keywords = [], maxExtras = 14) {
     .filter(def => !coreIds.has(def.id) && def.pins.length > 0 && def.pins.length <= 44)
     .map(def => {
       const hay = `${def.id} ${def.name} ${def.category || ''} ${def.help || ''}`.toLowerCase();
-      const score = lowered.reduce((sum, kw) => sum + (hay.includes(kw) ? 1 : 0), 0);
+      const score = lowered.reduce((sum, kw) => sum + (hay.includes(kw) ? 2 : 0), 0) + (def.visual?.assetUrl ? 1 : 0);
       return { def, score };
     })
-    .filter(item => item.score > 0)
+    .filter(item => item.score > 1)
     .sort((a, b) => b.score - a.score || a.def.pins.length - b.def.pins.length)
     .slice(0, maxExtras)
     .map(item => item.def);
@@ -369,6 +372,7 @@ export function buildTemplatePrompt(idea, catalogSubset, previousError = '') {
   const catalogContext = catalogSubset.map(def => ({
     type: def.id,
     name: def.name,
+    hasPhoto: Boolean(def.visual?.assetUrl),
     variants: def.variants?.map(v => ({ id: v.id, voltage: v.voltage })) || [],
     pins: def.pins.map((p, idx) => ({ pin: idx, name: p.name, kind: p.kind })),
     ...(def.conductors?.length ? { conductors: def.conductors } : {})
@@ -380,20 +384,21 @@ Instructions: ${idea.prompt}
 
 Strict wiring & safety rules:
 1. Use ONLY component types, variant pack IDs, and 0-based pin indices from the catalog JSON below.
-2. Wiring rules:
+2. Prefer real photographed components (hasPhoto: true — such as Adafruit Feather/ESP32/Pico boards, photographed servos, PCA9685/L293D drivers, OLED/TFT displays, GPS, pushbuttons, photographed LEDs, and LiPo/coin cells) whenever a compatible photographed part is in the catalog! Only use non-photo built-ins (battery, motorDriver, motor, servo, ultrasonic, led) when needed for simulation or when no photographed equivalent exists.
+3. Wiring rules:
    - output -> input or drive-input
    - power -> power-input or drive-input (NEVER connect a battery directly to an LED!)
    - ground / ground-input / passive-ground can connect together to form a common ground net!
    - 2-pin cells/batteries can connect in series: Cell A (+) [power] -> Cell B (-) [ground].
    - For bidirectional pins (or NodeMCU GPIO inputs), set pinDirections explicitly.
-3. Safety rules (MUST have zero warnings):
-   - NEVER drive a DC gearmotor directly from MCU/NodeMCU GPIO — always use motorDriver (TB6612FNG).
+4. Safety rules (MUST have zero warnings):
+   - NEVER drive a DC gearmotor directly from MCU/NodeMCU GPIO — always use a motor driver (motorDriver TB6612FNG or L293D).
    - NEVER use nineVolt battery on a servo or motorDriver VM — use eneloop4 or pro4 (4.8 V).
-   - NEVER connect 5V HC-SR04 ECHO directly to a 3.3V NodeMCU input (use virtual mcu for HC-SR04 templates).
+   - NEVER connect 5V HC-SR04 ECHO directly to a 3.3V NodeMCU (esp8266) input.
    - Always connect shared ground to every servo, motorDriver, ultrasonic, and LED cathode.
-   - For mcu nodes, set modes (array of 4: 'low'|'high'|'blink') so the circuit visibly comes alive when the user presses Run! (For TB6612FNG, make sure STBY, PWMA/PWMB, and one direction pin are HIGH/blink, plus VM, VCC, and GND connected.)
-4. Set pack to "" for non-battery parts, distanceCm to 40 (or a sensible number 2–400 for ultrasonic), period to 1, pinDirections to [] when not needed.
-5. Speed rule: Do NOT call any tools (no run_command, no read_file, no search_web). Everything you need is in the catalog below. Return ONLY the structured JSON matching the schema.${previousError ? `\n\nYour previous attempt failed validation with this error — FIX IT:\n${previousError}` : ''}
+   - For output/bidirectional pins driving actuators or LEDs, set modes ('low'|'high'|'blink') so the circuit comes alive when the user presses Run!
+5. Set pack to "" for non-battery parts, distanceCm to 40 (or a sensible number 2–400 for ultrasonic), period to 1, pinDirections to [] when not needed.
+6. Speed rule: Do NOT call any tools (no run_command, no read_file, no search_web). Everything you need is in the catalog below. Return ONLY the structured JSON matching the schema.${previousError ? `\n\nYour previous attempt failed validation with this error — FIX IT:\n${previousError}` : ''}
 
 Available catalog:
 ${JSON.stringify(catalogContext)}`;

@@ -68,16 +68,18 @@ function genericInspector(n){
  const pins=RobotModel.pins(state,n);
  const rows=pins.map((pin,index)=>{
   if(def.pins[index].kind==='bidirectional'){
-   return '<div class="bidirectional-pin"><span>'+esc(pin.name)+'</span><select data-pin-direction="'+index+'" aria-label="'+esc(pin.name)+' direction"><option value="input" '+(pin.kind==='input'?'selected':'')+'>Input</option><option value="output" '+(pin.kind==='output'?'selected':'')+'>Output</option></select>'+(pin.kind==='output'?'<select data-pin-mode="'+index+'" aria-label="'+esc(pin.name)+' output level"><option value="low" '+(n.modes[index]==='low'?'selected':'')+'>Low</option><option value="high" '+(n.modes[index]==='high'?'selected':'')+'>High</option><option value="blink" '+(n.modes[index]==='blink'?'selected':'')+'>Pulse</option></select>':'')+'</div>';
+   return '<div class="bidirectional-pin"><span>'+esc(pin.name)+'</span><div class="pin-mode-controls">'+['input','output'].map(direction=>'<button type="button" data-pin-direction="'+index+'" data-direction="'+direction+'" aria-pressed="'+(pin.kind===direction)+'">'+(direction==='input'?'Input':'Output')+'</button>').join('')+(pin.kind==='output'?['low','high','blink'].map(mode=>'<button type="button" class="pin-output-mode" data-pin-mode="'+index+'" data-mode="'+mode+'" aria-pressed="'+(n.modes[index]===mode)+'">'+(mode==='blink'?'Pulse':mode[0].toUpperCase()+mode.slice(1))+'</button>').join(''):'')+'</div></div>';
   }
   return '<div>'+esc(pin.name)+' <small>'+esc(pin.kind+conductorDescription(def,pin.id))+'</small></div>';
  }).join('');
  const links=sources.filter(source=>source&&/^https:\/\//.test(source.url||'')).map(source=>'<p class="inspect-help"><a href="'+esc(source.url)+'" target="_blank" rel="noopener">'+esc(source.label||source.title||'Part reference')+'</a></p>').join('');
  $('#inspectorContent').innerHTML='<h2 class="inspect-name">'+esc(def?.name||n.type)+'</h2><div class="inspect-type">'+esc(def?.category||'Component')+'</div><p class="inspect-help">'+esc(def?.help||'Component pin map. Review the part documentation before wiring real hardware.')+'</p><div class="generic-inspector-pins"><strong>TERMINALS</strong>'+rows+'</div>'+links+(state.wires.some(wire=>wire.to===n.id||wire.from===n.id)?'<button class="remove-wire" id="disconnect">Disconnect inputs</button>':'')+'<button class="remove-wire" id="removeSelected">Remove component</button>';
- document.querySelectorAll('[data-pin-mode]').forEach(select=>select.onchange=()=>{n.modes[+select.dataset.pinMode]=select.value;save();updateSignals()});
- document.querySelectorAll('[data-pin-direction]').forEach(select=>select.onchange=()=>{
+ document.querySelectorAll('[data-pin-mode]').forEach(button=>button.onclick=()=>{
+  snapshot();n.modes[+button.dataset.pinMode]=button.dataset.mode;render();
+ });
+ document.querySelectorAll('[data-pin-direction]').forEach(button=>button.onclick=()=>{
   snapshot();n.pinDirections??=def.pins.map(pin=>pin.kind==='bidirectional'?'input':pin.kind);
-  n.pinDirections[+select.dataset.pinDirection]=select.value;
+  n.pinDirections[+button.dataset.pinDirection]=button.dataset.direction;
   state.wires=state.wires.filter(wire=>RobotModel.wireValid(state,wire));
   render();
  });
@@ -171,10 +173,17 @@ window.CanvasAI={
   if(pendingRestore)throw Error('Wait for the component catalog to restore your saved project.');
   if(!plan||!Array.isArray(plan.components)||!Array.isArray(plan.wires)||plan.components.length>20||plan.wires.length>60)throw Error('The proposed build is too large. Try a smaller idea.');
   if(state.nodes.length+plan.components.length>150)throw Error('The canvas limit is 150 components. Remove a few parts first.');
-  if(plan.components.some(c=>{const def=ComponentRegistry.get(c?.type);return !def||(def.variants?.length&&!def.variants.some(v=>v.id===c.pack))}))throw Error('The plan included a part that is not in this canvas library.');
+  if(plan.components.some(c=>{
+  const def=ComponentRegistry.get(c?.type);
+  if(!def||(def.variants?.length&&!def.variants.some(v=>v.id===c.pack)))return true;
+  const directions=c.pinDirections||[];
+  return !Array.isArray(directions)||directions.some((entry,index)=>!entry||!Number.isInteger(entry.pin)||
+   entry.pin<0||entry.pin>=def.pins.length||def.pins[entry.pin].kind!=='bidirectional'||
+   !['input','output'].includes(entry.direction)||directions.findIndex(other=>other?.pin===entry.pin)!==index);
+ }))throw Error('The plan included an unknown part or invalid GPIO direction.');
   if(plan.components.filter(c=>c.type==='esp8266').length+state.nodes.filter(n=>RobotModel.firmwareTarget(state,n)).length>4)throw Error('This workspace supports up to four firmware boards per project.');
   const rect=viewport.getBoundingClientRect(),startX=(rect.width/2-pan.x)/zoom-180,startY=(rect.height/2-pan.y)/zoom-100;
-  const additions=plan.components.map((c,i)=>{const def=ComponentRegistry.get(c.type);return {id:uid(),type:c.type,...(def.variants?.length?{pack:c.pack}:{}),x:Math.round((startX+(i%3)*210)/10)*10,y:Math.round((startY+Math.floor(i/3)*180)/10)*10,modes:c.type==='esp8266'?RobotModel.espPins.map(()=> 'low'):def.renderer==='generic'?def.pins.map(()=> 'low'):['blink','low','low','low'],period:1,...(c.type==='esp8266'?{firmware:{preset:'blink'}}:{})}});
+  const additions=plan.components.map((c,i)=>{const def=ComponentRegistry.get(c.type);return {id:uid(),type:c.type,...(def.variants?.length?{pack:c.pack}:{}),x:Math.round((startX+(i%3)*210)/10)*10,y:Math.round((startY+Math.floor(i/3)*180)/10)*10,modes:c.type==='esp8266'?RobotModel.espPins.map(()=> 'low'):def.renderer==='generic'?def.pins.map(()=> 'low'):['blink','low','low','low'],period:1,...(def.pins.some(pin=>pin.kind==='bidirectional')?{pinDirections:def.pins.map((pin,index)=>pin.kind==='bidirectional'?(c.pinDirections?.find(item=>item.pin===index)?.direction||'input'):pin.kind)}:{}),...(c.type==='esp8266'?{firmware:{preset:'blink'}}:{})}});
   const combined=[...state.nodes,...additions],newWires=[];
   for(const w of plan.wires){if(!w||![w.aComponent,w.aPin,w.bComponent,w.bPin].every(Number.isInteger)||w.aComponent<0||w.bComponent<0||w.aComponent>=combined.length||w.bComponent>=combined.length)throw Error('The plan referred to a component or pin that does not exist.');const wire=RobotModel.connection({ ...state,nodes:combined,wires:[...state.wires,...newWires] },{id:combined[w.aComponent].id,pin:w.aPin},{id:combined[w.bComponent].id,pin:w.bPin});if(!wire)throw Error(`The suggested connection between ${componentLabel(combined[w.aComponent])} and ${componentLabel(combined[w.bComponent])} is not compatible with their pin types.`);if(state.wires.some(existing=>RobotModel.attachmentKey({nodes:combined},existing)===RobotModel.attachmentKey({nodes:combined},wire))||newWires.some(existing=>RobotModel.attachmentKey({nodes:combined},existing)===RobotModel.attachmentKey({nodes:combined},wire)))continue;newWires.push(wire)}
   if(state.wires.length+newWires.length>600)throw Error('The canvas limit is 600 connections per project.');

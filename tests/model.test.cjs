@@ -53,3 +53,83 @@ test('pass-through contacts carry a single compatible source in either direction
   assert.throws(()=>registry.replace([{...cable,conductors:[['A-power','B-ground']]}]));
  } finally { registry.replace(original); }
 });
+
+test('TB6612FNG digital truth table drives motor forward/reverse and HC-SR04 responds to TRIG', () => {
+ const s = {
+  name: 'Robotics',
+  boards: [],
+  nodes: [
+   node('mcu', 'mcu', { modes: ['high', 'high', 'low', 'high'] }), // D0=PWMA, D1=AIN1, D2=AIN2, D3=STBY
+   node('bat', 'battery', { pack: 'eneloop4' }),
+   node('drv', 'motorDriver'),
+   node('mot', 'motor'),
+   node('sonar', 'ultrasonic', { distanceCm: 25 })
+  ],
+  wires: [
+   { from: 'bat', pin: 0, to: 'drv', toPin: 8 }, // VM
+   { from: 'bat', pin: 0, to: 'drv', toPin: 9 }, // VCC
+   { from: 'bat', pin: 1, to: 'drv', toPin: 7 }, // GND
+   { from: 'mcu', pin: 0, to: 'drv', toPin: 0 }, // PWMA
+   { from: 'mcu', pin: 1, to: 'drv', toPin: 2 }, // AIN1 = HIGH
+   { from: 'mcu', pin: 2, to: 'drv', toPin: 1 }, // AIN2 = LOW
+   { from: 'mcu', pin: 3, to: 'drv', toPin: 3 }, // STBY = HIGH
+   { from: 'drv', pin: 11, to: 'mot', toPin: 0 }, // AO1 -> M+
+   { from: 'drv', pin: 12, to: 'mot', toPin: 1 }, // AO2 -> M-
+   { from: 'bat', pin: 0, to: 'sonar', toPin: 0 }, // VCC
+   { from: 'bat', pin: 1, to: 'sonar', toPin: 3 }, // GND
+   { from: 'mcu', pin: 0, to: 'sonar', toPin: 1 } // TRIG
+  ]
+ };
+ assert.equal(M.valid(s), true);
+ assert.equal(M.wireRole(s, s.wires[0]), 'power');
+ assert.equal(M.wireRole(s, s.wires[2]), 'ground');
+ assert.equal(M.wireRole(s, s.wires[3]), 'signal');
+ // Forward: AO1 HIGH, AO2 LOW
+ assert.equal(M.input(s, s.nodes[3], 0, true, 0), true);
+ assert.equal(M.input(s, s.nodes[3], 1, true, 0), false);
+ // Standby LOW stops outputs
+ s.nodes[0].modes[3] = 'low';
+ assert.equal(M.input(s, s.nodes[3], 0, true, 0), false);
+ // Reverse: STBY HIGH, AIN1 LOW, AIN2 HIGH
+ s.nodes[0].modes[3] = 'high';
+ s.nodes[0].modes[1] = 'low';
+ s.nodes[0].modes[2] = 'high';
+ assert.equal(M.input(s, s.nodes[3], 0, true, 0), false);
+ assert.equal(M.input(s, s.nodes[3], 1, true, 0), true);
+ // HC-SR04 ECHO responds when VCC, GND, TRIG are active
+ assert.equal(M.output(s, s.nodes[4], 2, true, 0), true);
+ s.nodes[0].modes[0] = 'low';
+ assert.equal(M.output(s, s.nodes[4], 2, true, 0), false);
+});
+
+test('diagnostics flags common beginner hardware hazards', () => {
+ const espModes = M.espPins.map(() => 'low');
+ const espDirs = M.espPins.map(p => p.kind);
+ espDirs[1] = 'input'; // D1 as input
+ const s = {
+  name: 'Hazards',
+  boards: [],
+  nodes: [
+   node('bat9', 'battery', { pack: 'nineVolt' }),
+   node('led', 'led'),
+   node('mcu', 'mcu'),
+   node('mot', 'motor'),
+   node('esp', 'esp8266', { modes: espModes, pinDirections: espDirs }),
+   node('sonar', 'ultrasonic'),
+   node('servo', 'servo')
+  ],
+  wires: [
+   { from: 'bat9', pin: 0, to: 'led', toPin: 0 },
+   { from: 'mcu', pin: 0, to: 'mot', toPin: 0 },
+   { from: 'sonar', pin: 2, to: 'esp', toPin: 1 },
+   { from: 'bat9', pin: 0, to: 'servo', toPin: 1 }
+  ]
+ };
+ assert.equal(M.valid(s), true);
+ const titles = M.diagnostics(s).map(d => d.title);
+ assert.ok(titles.some(t => /LED wired directly to battery/.test(t)));
+ assert.ok(titles.some(t => /Motor driven directly by GPIO/.test(t)));
+ assert.ok(titles.some(t => /5 V HC-SR04 ECHO/.test(t)));
+ assert.ok(titles.some(t => /9 V battery on 4\.8 V servo/.test(t)));
+ assert.ok(titles.some(t => /missing a ground/.test(t)));
+});

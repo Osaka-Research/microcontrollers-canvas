@@ -40,3 +40,37 @@ test('named pass-through rows connect from either end and expose their paired co
   b.dom.window.close();
  }
 });
+
+test('passive conductor wires animate when driven, show pin names, and delete independently', () => {
+ const b = boot();
+ try {
+  const cable = {
+   id:'busFixture', name:'Bus fixture', renderer:'generic',
+   pins:['A','B','C'].map(id => ({id, name:id+' terminal', kind:'passive-signal'})),
+   conductors:[['A','B','C']]
+  };
+  b.w.refreshComponentRegistry([...require('../scripts/initial-component-catalog.cjs'), cable]);
+  b.run("add('mcu');add('busFixture');add('busFixture');add('led')");
+  b.run(`
+   state.nodes[0].modes[0]='high';
+   commitConnection({id:state.nodes[0].id,pin:0},{id:state.nodes[1].id,pin:0});
+   commitConnection({id:state.nodes[1].id,pin:1},{id:state.nodes[2].id,pin:0});
+   commitConnection({id:state.nodes[2].id,pin:1},{id:state.nodes[3].id,pin:0});
+   started=true;running=true;selected=state.nodes[1].id;render();
+  `);
+  // All three wires (including passive-to-passive and passive-to-LED) should be HIGH
+  const wirePaths = [...b.w.document.querySelectorAll('#wires path.wire')];
+  assert.equal(wirePaths.length, 3);
+  assert.ok(wirePaths.every(p => p.classList.contains('high')));
+  // Inspector connection labels should show actual pin names, not "pin 1"
+  assert.match(b.$('#inspectorContent').textContent, /D0/);
+  assert.match(b.$('#inspectorContent').textContent, /A terminal/);
+  assert.doesNotMatch(b.$('#inspectorContent').textContent, /· pin \d+/);
+  // Deleting one wire connected to a passive contact must not delete the other wire
+  const bus2Wire = b.run(`RobotModel.attachmentKey(state, state.wires[1])`);
+  b.run(`deleteWire(${JSON.stringify(bus2Wire)})`);
+  assert.equal(b.run('state.wires.length'), 2);
+ } finally {
+  b.dom.window.close();
+ }
+});

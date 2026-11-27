@@ -172,3 +172,63 @@ main{position:relative;display:grid;grid-template-rows:minmax(0,1fr) 230px;min-w
 .wire.selected{stroke:#f0a52b;stroke-width:6;filter:drop-shadow(0 0 4px #f0a52b99)}.connection-list{border-top:1px solid var(--line);margin-top:18px;padding-top:14px}.connection-item{display:flex;align-items:center;gap:6px;margin-top:7px}.connection-select{flex:1;min-width:0;text-align:left;border:1px solid var(--line);background:#fff;border-radius:5px;padding:7px;font-size:9px;line-height:1.45}.connection-delete-icon{flex:0 0 28px;width:28px;height:28px;border:1px solid #eadcda;background:#fff;border-radius:5px;color:#b5483e;font-size:15px}.connection-delete{color:#b5483e;border-color:#eadcda}
 
 .wire-context-delete{position:absolute;z-index:9;width:36px;height:36px;display:grid;place-items:center;padding:8px;border:1px solid #e5b7b2;border-radius:9px;background:#fff;color:#b5483e;box-shadow:0 4px 14px #18251d30;cursor:pointer}.wire-context-delete:hover{background:#fff4f2;border-color:#c87c73}.wire-context-delete svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.wire-context-delete[hidden]{display:none}
+
+/* Wire color-coding by electrical role */
+.wire.wire-power{stroke:#c94f46}
+.wire.wire-ground{stroke:#4b5563}
+.wire.wire-signal{stroke:#3b7a9e}
+.wire.high{stroke:#eba849}
+:root[data-theme="dark"] .wire.wire-power{stroke:#e86b61}
+:root[data-theme="dark"] .wire.wire-ground{stroke:#9aa5b1}
+:root[data-theme="dark"] .wire.wire-signal{stroke:#68b4db}
+:root[data-theme="dark"] .wire.high{stroke:#f2ba5c}
+
+/* Right-hand docked inspector panel (auto-hides when nothing is selected) */
+.app{grid-template-columns:280px minmax(0,1fr) auto}
+.components-closed .app{grid-template-columns:0 minmax(0,1fr) auto}
+.app>.inspector{position:relative;inset:auto;width:276px;height:100dvh;max-height:none;padding:18px 16px;background:#f8faf9;border-left:1px solid #dfe6e1;border-top:0;border-right:0;border-bottom:0;border-radius:0;overflow:auto;z-index:6}
+.app>.inspector:has(.inspect-empty){display:none}
+.app>.inspector .howto{display:none}
+.app>.inspector #inspectorContent{padding-top:14px}
+@media(max-width:960px){
+ .app{grid-template-columns:250px minmax(0,1fr)}
+ .components-closed .app{grid-template-columns:0 minmax(0,1fr)}
+ .app>.inspector{position:fixed;right:10px;top:58px;bottom:auto;width:min(276px,calc(100vw - 68px));height:auto;max-height:62dvh;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px #182a2026;z-index:25}
+}
+@media(max-width:560px){
+ .app{grid-template-columns:minmax(0,1fr)}
+ .app>.inspector{right:8px;top:52px;width:min(270px,calc(100vw - 64px))}
+}
+
+/* Collapsible library categories, safety warnings & MicroPython script editor */
+.category-group{margin:0}
+.category-group>summary.category{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;margin:16px 0 10px}
+.category-group>summary.category::-webkit-details-marker{display:none}
+.category-group>summary.category::before{content:'▾';margin-right:6px;font-size:10px;color:#8c9b90}
+.category-group:not([open])>summary.category::before{content:'▸'}
+.category-group>summary.category>span{margin-left:auto;font-weight:500;opacity:.75}
+.safety-warnings{display:grid;gap:7px;margin:14px 0}
+.safety-item{border-radius:7px;padding:9px 10px;font-size:10px;line-height:1.55;border:1px solid #e6d5b5;background:#fdf8ec;color:#664b19}
+.safety-item.info{border-color:#d4e2dc;background:#f2f7f4;color:#3d5c4c}
+.safety-item strong{display:block;font-size:10px;margin-bottom:3px}
+.safety-item p{margin:0;opacity:.92}
+.python-script{width:100%;font:10px/1.5 monospace;border:1px solid #d4dfd0;border-radius:6px;padding:8px;background:#fafcfa;color:var(--ink);resize:vertical;min-height:92px}
+
+/* Complete dark mode coverage */
+:root[data-theme="dark"] .app>.inspector{background:#252526;border-color:#3c4140}
+:root[data-theme="dark"] .floating-tools,:root[data-theme="dark"] .zoom{background:#292d2b;border-color:#424c45}
+:root[data-theme="dark"] .floating-tools button,:root[data-theme="dark"] .zoom button,:root[data-theme="dark"] .zoom #resetView{color:#c6d1ca}
+:root[data-theme="dark"] .floating-tools button.active{background:#34483c;color:#98dfb4}
+:root[data-theme="dark"] .floating-tools>span{border-color:#424c45}
+:root[data-theme="dark"] .dev-entry{background:#2a3730;border-color:#415649;color:#a8e0bc}
+:root[data-theme="dark"] .dev-entry span{color:#9ab0a2}
+:root[data-theme="dark"] .reading{background:#2c3630;border-color:#425248;color:#b8d9c3}
+:root[data-theme="dark"] .remove-wire,:root[data-theme="dark"] .connection-select,:root[data-theme="dark"] .connection-delete-icon,:root[data-theme="dark"] .wire-context-delete,:root[data-theme="dark"] .signal-row select,:root[data-theme="dark"] .firmware-select,:root[data-theme="dark"] #serialInput,:root[data-theme="dark"] .python-script,:root[data-theme="dark"] .pin-mode-controls button,:root[data-theme="dark"] .ai-auth-choice,:root[data-theme="dark"] .ai-disconnect{background:#2b2f2d;border-color:#465149;color:#dce5df}
+:root[data-theme="dark"] .ai-auth-choice.active,:root[data-theme="dark"] .pin-mode-controls button[aria-pressed="true"]{background:#32453a;border-color:#68a782;color:#a7e7be}
+:root[data-theme="dark"] .ai-message.user{background:#2d4537;color:#d6efe0}
+:root[data-theme="dark"] .safety-item{background:#3a3121;border-color:#6c5830;color:#f3d79d}
+:root[data-theme="dark"] .safety-item.info{background:#293630;border-color:#425b4d;color:#b9dbc5}
+:root[data-theme="dark"] #boardEditor input:not([type=range]),:root[data-theme="dark"] #boardEditor select,:root[data-theme="dark"] .editor-close{background:#2f3432;border-color:#465149;color:#e1e9e3}
+:root[data-theme="dark"] .pin-list-item.selected{background:#324138}
+:root[data-theme="high-contrast"] .app>.inspector{background:#000;color:#fff;border-color:#fff}
+:root[data-theme="high-contrast"] .floating-tools,:root[data-theme="high-contrast"] .zoom,:root[data-theme="high-contrast"] .reading,:root[data-theme="high-contrast"] .remove-wire,:root[data-theme="high-contrast"] .connection-select,:root[data-theme="high-contrast"] .wire-context-delete,:root[data-theme="high-contrast"] .python-script{background:#000;color:#fff;border-color:#fff}

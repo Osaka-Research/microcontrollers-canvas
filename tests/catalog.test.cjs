@@ -79,3 +79,71 @@ test('seed, catalog API, build API and project tables use the migrated database'
   await assert.rejects(db.query('select * from user_projects'), /permission denied/);
   await assert.rejects(db.query('select * from project_templates'), /permission denied/);
 });
+
+test('build API accepts 127.0.0.1 local origin, enforces 1200-char idea limit, and returns discovered local parts', async t => {
+  const os = require('node:os');
+  const path = require('node:path');
+  const fs = require('node:fs');
+  const { DatabaseSync } = require('node:sqlite');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcc-local-'));
+  const dbPath = path.join(tmpDir, 'catalog.sqlite');
+  const prevLocalDb = process.env.LOCAL_COMPONENT_DB;
+  const prevRoot = process.env.LOCAL_CATALOG_ROOT;
+  const prevOrigin = process.env.CANVAS_ORIGIN;
+
+  const db = new DatabaseSync(dbPath);
+  db.exec(`
+    CREATE TABLE component_catalog (id TEXT PRIMARY KEY, category TEXT, status TEXT, version INTEGER, definition TEXT, updated_at TEXT);
+    CREATE TABLE adafruit_products (product_id TEXT PRIMARY KEY, raw_json TEXT);
+  `);
+  const seed = require('../scripts/initial-component-catalog.cjs')[0];
+  db.prepare(`INSERT INTO component_catalog VALUES (?, ?, 'published', 1, ?, ?)`).run(
+    seed.id, seed.category, JSON.stringify({ ...seed, needsPinoutResearch: 0 }), new Date().toISOString()
+  );
+  db.close();
+
+  process.env.LOCAL_COMPONENT_DB = dbPath;
+  process.env.LOCAL_CATALOG_ROOT = tmpDir;
+  delete process.env.CANVAS_ORIGIN;
+  t.after(() => {
+    if (prevLocalDb === undefined) delete process.env.LOCAL_COMPONENT_DB; else process.env.LOCAL_COMPONENT_DB = prevLocalDb;
+    if (prevRoot === undefined) delete process.env.LOCAL_CATALOG_ROOT; else process.env.LOCAL_CATALOG_ROOT = prevRoot;
+    if (prevOrigin === undefined) delete process.env.CANVAS_ORIGIN; else process.env.CANVAS_ORIGIN = prevOrigin;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  const discovered = {
+    id: 'localpart', name: 'Local test part', category: 'Test', label: 'Local part',
+    help: '', icon: '', subtitle: '', pins: [{ id: 'in', kind: 'input', name: 'IN' }],
+    conductors: [],
+    sources: [{ label: 'Datasheet', url: 'https://example.org/datasheet' }],
+    visual: { imageUrl: '', imageSource: '', symbol: '+' }
+  };
+  const plan = { summary: 'Add localpart.', components: [{ type: 'localpart', pack: '', pinDirections: [] }], wires: [] };
+
+  t.mock.method(global, 'fetch', async (_address, options) => {
+    const payload = JSON.parse(options.body);
+    const result = payload.text.format.name === 'missing_components' ? { components: [discovered] } : plan;
+    return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(result) }] }] });
+  });
+
+  async function reqWithOrigin(body) {
+    const headers = {};
+    const res = {
+      setHeader(k, v) { headers[k] = v; },
+      end(value) { this.body = value ? JSON.parse(value) : null; this.headers = headers; }
+    };
+    await build({ method: 'POST', headers: { origin: 'http://127.0.0.1:4173' }, body }, res);
+    return res;
+  }
+
+  const tooLong = await reqWithOrigin({ action: 'build', apiKey: 'local-test-placeholder-key', idea: 'a'.repeat(1201), context: {} });
+  assert.equal(tooLong.statusCode, 400);
+  assert.equal(tooLong.headers['Access-Control-Allow-Origin'], 'http://127.0.0.1:4173');
+
+  const ok = await reqWithOrigin({ action: 'build', apiKey: 'local-test-placeholder-key', idea: 'Add localpart', context: {} });
+  assert.equal(ok.statusCode, 200);
+  assert.equal(ok.headers['Access-Control-Allow-Origin'], 'http://127.0.0.1:4173');
+  assert.ok(ok.body.definitions.some(def => def.id === 'localpart'));
+});

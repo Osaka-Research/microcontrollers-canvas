@@ -110,7 +110,7 @@ module.exports = async function build(req, res) {
   const origin = req.headers.origin;
   const vercelHost = process.env.VERCEL_URL;
   const allowedOrigin = process.env.CANVAS_ORIGIN || (vercelHost ? `https://${vercelHost}` : '');
-  const localOrigin = typeof origin === 'string' && /^http:\/\/localhost:\d+$/.test(origin);
+  const localOrigin = typeof origin === 'string' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
   const cors = {};
   if (origin && allowedOrigin && origin !== allowedOrigin && !(localOrigin && !process.env.CANVAS_ORIGIN)) return send(res, 403, { error: 'This site is not allowed to use the project server.' });
   if (origin && !allowedOrigin && !localOrigin) return send(res, 503, { error: 'Set CANVAS_ORIGIN to this website’s HTTPS origin in the server deployment settings.' });
@@ -146,7 +146,7 @@ module.exports = async function build(req, res) {
     }
   }
   if (body.action && body.action !== 'build') return send(res, 400, { error: 'Unknown AI request action.' }, cors);
-  if (typeof idea !== 'string' || !idea.trim() || idea.length > 30000) return send(res, 400, { error: 'Describe a circuit idea in 1,200 characters or less.' }, cors);
+  if (typeof idea !== 'string' || !idea.trim() || idea.length > 1200) return send(res, 400, { error: 'Describe a circuit idea in 1,200 characters or less.' }, cors);
   if (!context || typeof context !== 'object' || JSON.stringify(context).length > 24000) return send(res, 400, { error: 'The current canvas context is too large.' }, cors);
   if (!Array.isArray(history) || history.length > 12 || history.some(m => !m || !['user', 'assistant'].includes(m.role) || typeof m.content !== 'string' || m.content.length > 1600)) return send(res, 400, { error: 'The chat history is invalid.' }, cors);
 
@@ -166,7 +166,13 @@ module.exports = async function build(req, res) {
     try { discovered = useChatGPT ? await discoverMissingWithChatGPT(req.chatgpt, model, idea, catalog) : await discoverMissing(apiKey, idea, catalog); }
     catch (error) { return send(res, 502, { error: error.message }, cors); }
     if (discovered.length) {
-      try { await savePublishedCatalog(discovered); catalog = await publishedCatalog(); }
+      try {
+        await savePublishedCatalog(discovered);
+        catalog = await publishedCatalog();
+        const byId = new Map(catalog.map(def => [def.id, def]));
+        for (const def of discovered) if (!byId.has(def.id)) byId.set(def.id, def);
+        catalog = [...byId.values()];
+      }
       catch (error) { return send(res, 503, { error: error.message }, cors); }
     }
     const schema = planSchema(catalog);

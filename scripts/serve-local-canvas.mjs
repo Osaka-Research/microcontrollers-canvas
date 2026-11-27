@@ -20,6 +20,11 @@ const { publishedCatalog } = require('../api/lib/catalog.js');
 const { DatabaseSync } = require('node:sqlite');
 const port = Number(process.env.PORT || 4173);
 const host = process.env.HOST || '127.0.0.1';
+let readDb = null;
+function getReadDb() {
+  if (!readDb) readDb = new DatabaseSync(process.env.LOCAL_COMPONENT_DB, { readOnly: true });
+  return readDb;
+}
 const mime = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
@@ -56,11 +61,7 @@ async function api(handler, req, res) {
 
 async function localImage(id, res) {
   if (!/^\d{1,8}\.jpg$/i.test(id)) return send(res, 404, { error: 'Image not found.' });
-  const db = new DatabaseSync(process.env.LOCAL_COMPONENT_DB, { readOnly: true });
-  let imagePath;
-  try {
-    imagePath = db.prepare('SELECT image_path FROM adafruit_products WHERE product_id = ?').get(id.slice(0, -4))?.image_path;
-  } finally { db.close(); }
+  const imagePath = getReadDb().prepare('SELECT image_path FROM adafruit_products WHERE product_id = ?').get(id.slice(0, -4))?.image_path;
   if (!imagePath) return send(res, 404, { error: 'Image not found.' });
   const absolute = path.resolve(root, imagePath);
   if (!absolute.startsWith(dataDir + path.sep)) return send(res, 404, { error: 'Image not found.' });
@@ -113,13 +114,12 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/local-assets/' + path.basename(url.pathname)) return localImage(path.basename(url.pathname), res);
   if (url.pathname === '/healthz') {
     try {
-      const db = new DatabaseSync(process.env.LOCAL_COMPONENT_DB, { readOnly: true });
+      const db = getReadDb();
       const counts = db.prepare(`SELECT count(*) AS products,
         sum(candidate) AS candidates FROM adafruit_products`).get();
       const researched = db.prepare(`SELECT count(*) AS researched FROM component_catalog
         WHERE json_array_length(json_extract(definition, '$.pins')) > 0
         AND json_extract(definition, '$.needsPinoutResearch') = 0`).get();
-      db.close();
       const definitions = await publishedCatalog();
       let activeResearch = null;
       try { activeResearch = JSON.parse(await readFile(path.join(dataDir, 'codex-progress.json'), 'utf8')); } catch {}
@@ -137,4 +137,4 @@ server.listen(port, host, () => {
   console.log('Local Adafruit photos are served only to this device; nothing is uploaded.');
 });
 
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close(() => process.exit(0)));
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { try { readDb?.close(); } catch {} server.close(() => process.exit(0)); });

@@ -43,3 +43,48 @@ test('loading a catalog restores a saved circuit and draws wires to a database p
   assert.deepEqual(JSON.parse(w.localStorage.getItem('robot-canvas-v1')).wires,JSON.parse(saved).wires);
  } finally { b.dom.window.close(); }
 });
+
+test('redo, wire role colors, safety warnings, MicroPython script runner, and non-overlapping AI layout work', () => {
+ const b = boot();
+ try {
+  const { $, run, w } = b;
+  class FakeWorker { constructor() { this.messages = []; } postMessage(m) { this.messages.push(m); } terminate() { this.stopped = true; } }
+  w.Worker = FakeWorker;
+  w.cancelAnimationFrame = () => {};
+
+  // Add components and verify Undo + Redo
+  run("add('mcu'); add('led'); add('battery');");
+  assert.equal(run('state.nodes.length'), 3);
+  $('#undo').click();
+  assert.equal(run('state.nodes.length'), 2);
+  $('#redo').click();
+  assert.equal(run('state.nodes.length'), 3);
+
+  // Wire battery + directly to LED anode and battery - to LED cathode -> check wire role classes & safety warning
+  run("commitConnection({id:state.nodes[2].id,pin:0},{id:state.nodes[1].id,pin:0}); commitConnection({id:state.nodes[2].id,pin:1},{id:state.nodes[1].id,pin:1}); selected=state.nodes[1].id; render();");
+  assert.ok($('.wire.wire-power'));
+  assert.ok($('.wire.wire-ground'));
+  assert.match($('#inspectorContent').textContent, /LED wired directly to battery/);
+  assert.match($('#counts').textContent, /⚠ 1/);
+
+  // Collapsible category search
+  $('#search').value = 'HC-SR04';
+  $('#search').dispatchEvent(new w.Event('input'));
+  assert.equal(w.document.querySelectorAll('.category-group:not([hidden])').length, 1);
+
+  // MicroPython script editor sends paste-mode payload
+  run("addEsp8266(); state.nodes.at(-1).firmware={preset:'micropython'}; selected=state.nodes.at(-1).id; render();");
+  $('#run').click();
+  $('#pythonScript').value = 'print(42)';
+  $('#pythonScript').dispatchEvent(new w.Event('input'));
+  $('#runPythonScript').click();
+  assert.equal(run("state.nodes.at(-1)._script"), 'print(42)');
+
+  // Collision-free AI layout places new parts cleanly to the right of existing parts
+  const maxBefore = run("Math.max(...state.nodes.map(n=>n.x))");
+  run("CanvasAI.apply({summary:'Add servo',components:[{type:'servo',pack:'',pinDirections:[]}],wires:[]})");
+  assert.ok(run('state.nodes.at(-1).x') > maxBefore);
+ } finally {
+  b.dom.window.close();
+ }
+});

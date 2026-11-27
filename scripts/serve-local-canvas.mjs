@@ -15,6 +15,7 @@ process.env.LOCAL_COMPONENT_DB ||= path.join(dataDir, 'catalog.sqlite');
 
 const require = createRequire(import.meta.url);
 const componentsHandler = require('../api/components.js');
+const templatesHandler = require('../api/templates.js');
 const buildHandler = require('../api/build.js');
 const { publishedCatalog } = require('../api/lib/catalog.js');
 const { DatabaseSync } = require('node:sqlite');
@@ -94,21 +95,7 @@ async function staticFile(pathname, res) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
   if (url.pathname === '/api/components') return api(componentsHandler, req, res);
-  if (url.pathname === '/api/templates' && req.method === 'GET') {
-    try {
-      const templates = [];
-      try {
-        const rows = getReadDb().prepare(`
-          SELECT id, name, category, difficulty, description, real_world_notes AS realWorldNotes, project, updated_at AS updatedAt
-          FROM project_templates WHERE status = 'ready' ORDER BY category, name
-        `).all();
-        for (const row of rows) templates.push({ ...row, project: JSON.parse(row.project) });
-      } catch { /* project_templates table may not exist yet */ }
-      return send(res, 200, { templates });
-    } catch (error) {
-      return send(res, 503, { error: error.message });
-    }
-  }
+  if (url.pathname === '/api/templates') return api(templatesHandler, req, res);
   if (url.pathname === '/api/build') { req.chatgpt = chatgpt; return api(buildHandler, req, res); }
   if (url.pathname === '/api/chatgpt/session' && req.method === 'GET') {
     try { return send(res, 200, { session: await chatgpt.getSession(), localOnly: true }); }

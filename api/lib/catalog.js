@@ -13,19 +13,7 @@ function localDefinitions() {
   const dbPath = process.env.LOCAL_COMPONENT_DB;
   if (!dbPath) return null;
   const { DatabaseSync } = require('node:sqlite');
-  const root = process.env.LOCAL_CATALOG_ROOT || process.cwd();
   const definitions = new Map();
-  const legacyPath = require('node:path').join(root, '.research', 'local-catalog.json');
-  try {
-    const legacy = JSON.parse(fs.readFileSync(legacyPath, 'utf8'));
-    for (const definition of legacy) {
-      if (definition && typeof definition.id === 'string' && Array.isArray(definition.pins)) {
-        definitions.set(definition.id, definition);
-      }
-    }
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-  }
 
   const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
@@ -36,6 +24,7 @@ function localDefinitions() {
       AND json_extract(c.definition, '$.needsPinoutResearch') = 0`).all();
     for (const row of rows) {
       const definition = JSON.parse(row.definition);
+      if (definition.enabled === false) continue;
       if (row.raw_json) {
         const product = JSON.parse(row.raw_json);
         definition.productDetails = {
@@ -59,11 +48,44 @@ function localDefinitions() {
     Array.isArray(definition.pins) && definition.pins.length > 0
   );
   for (const definition of ready) {
+    if (definition.visual?.assetUrl?.startsWith('/local-assets/')) continue;
     const localPath = definition.localImagePath || definition.visual?.assetUrl || '';
     const match = String(localPath).match(/(?:images(?:-cropped)?\/)?(\d+)\.jpg$/);
     if (match) definition.visual = { ...(definition.visual || {}), assetUrl: `/local-assets/${match[1]}.jpg` };
   }
   return ready;
+}
+
+function localTemplates() {
+  const dbPath = process.env.LOCAL_COMPONENT_DB;
+  if (!dbPath) return null;
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const rows = db.prepare(`
+      SELECT id, name, category, difficulty, description, real_world_notes AS realWorldNotes, project, updated_at AS updatedAt
+      FROM project_templates WHERE status = 'ready' ORDER BY category, name
+    `).all();
+    return rows.map(row => ({ ...row, project: JSON.parse(row.project) }));
+  } catch {
+    return [];
+  } finally {
+    db.close();
+  }
+}
+
+async function publishedTemplates() {
+  const local = localTemplates();
+  if (local !== null) return local;
+  const { url, key } = base();
+  const response = await fetch(`${url}/rest/v1/project_templates?select=id,name,description,project,updated_at&visibility=eq.public&order=updated_at.desc`, {
+    headers: { apikey: key, Accept: 'application/json' }
+  });
+  if (!response.ok) throw new Error(`Templates database request failed (${response.status}).`);
+  const rows = await response.json();
+  if (!Array.isArray(rows)) throw new Error('Templates database returned invalid data.');
+  return rows.filter(row => row && typeof row.name === 'string' && row.project && typeof row.project === 'object')
+    .map(row => ({ id: row.id, name: row.name, category: 'TEMPLATES', description: row.description || '', project: row.project, updatedAt: row.updated_at }));
 }
 
 async function publishedCatalog() {
@@ -151,4 +173,4 @@ async function savePublishedCatalog(definitions) {
   if (!response.ok) throw new Error(`Could not save researched components (${response.status}).`);
 }
 
-module.exports = { publishedCatalog, savePublishedCatalog };
+module.exports = { publishedCatalog, publishedTemplates, savePublishedCatalog };

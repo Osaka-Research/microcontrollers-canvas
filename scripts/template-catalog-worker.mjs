@@ -222,7 +222,7 @@ export function ensureTemplatesTable(db) {
 }
 
 export function loadLocalCatalog(db) {
-  const byId = new Map(initialCatalog.filter(def => def.enabled !== false).map(def => [def.id, structuredClone(def)]));
+  const byId = new Map();
   try {
     const rows = db.prepare(`
       SELECT definition FROM component_catalog
@@ -232,15 +232,20 @@ export function loadLocalCatalog(db) {
     `).all();
     for (const row of rows) {
       const def = JSON.parse(row.definition);
-      if (def?.id && Array.isArray(def.pins) && def.pins.length > 0 && ComponentRegistry.validConductors(def)) {
-        const localPath = def.localImagePath || def.visual?.assetUrl || '';
-        const match = String(localPath).match(/(?:images(?:-cropped)?\/)?(\d+)\.jpg$/);
-        if (match) def.visual = { ...(def.visual || {}), assetUrl: `/local-assets/${match[1]}.jpg` };
+      if (def?.id && def.enabled !== false && Array.isArray(def.pins) && def.pins.length > 0 && ComponentRegistry.validConductors(def)) {
+        if (!def.visual?.assetUrl?.startsWith('/local-assets/')) {
+          const localPath = def.localImagePath || def.visual?.assetUrl || '';
+          const match = String(localPath).match(/(?:images(?:-cropped)?\/)?(\d+)\.jpg$/);
+          if (match) def.visual = { ...(def.visual || {}), assetUrl: `/local-assets/${match[1]}.jpg` };
+        }
         def.enabled = true;
         byId.set(def.id, def);
       }
     }
-  } catch { /* component_catalog may not exist in standalone template test DBs */ }
+  } catch { /* standalone unit test DB without component_catalog table */ }
+  if (!byId.size) {
+    for (const def of initialCatalog.filter(d => d.enabled !== false)) byId.set(def.id, structuredClone(def));
+  }
   return [...byId.values()];
 }
 

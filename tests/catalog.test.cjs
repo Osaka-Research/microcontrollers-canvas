@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { PGlite } = require('../.qa/node_modules/@electric-sql/pglite');
 const components = require('../api/components.js');
+const templates = require('../api/templates.js');
 const build = require('../api/build.js');
 
 async function request(handler, method, body) {
@@ -44,8 +45,12 @@ test('seed, catalog API, build API and project tables use the migrated database'
       return Response.json({ output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(result) }] }] });
     }
     assert.equal(path.origin, url);
-    assert.equal(path.pathname, '/rest/v1/component_catalog');
     assert.equal(options.headers.apikey, 'local-test');
+    if (path.pathname === '/rest/v1/project_templates') {
+      assert.equal(path.searchParams.get('visibility'), 'eq.public');
+      return Response.json((await db.query("select id,name,description,project,updated_at from project_templates where visibility='public' order by updated_at desc")).rows);
+    }
+    assert.equal(path.pathname, '/rest/v1/component_catalog');
     if (options.method === 'POST') {
       for (const row of JSON.parse(options.body)) {
         await db.query('insert into component_catalog (id, category, status, version, definition) values ($1,$2,$3,$4,$5) on conflict do nothing',
@@ -71,7 +76,11 @@ test('seed, catalog API, build API and project tables use the migrated database'
   const id = '11234567-89ab-4def-8123-456789abcdef';
   const project = { name: 'Demo', nodes: [], wires: [] };
   await db.query('insert into auth.users values ($1)', [owner]);
-  await db.query('insert into project_templates (id,owner_id,name,project) values ($1,$2,$3,$4)', [id, owner, project.name, JSON.stringify(project)]);
+  await db.query("insert into project_templates (id,owner_id,name,visibility,project) values ($1,$2,$3,'public',$4)", [id, owner, project.name, JSON.stringify(project)]);
+  const tplRes = await request(templates, 'GET');
+  assert.equal(tplRes.statusCode, 200);
+  assert.equal(tplRes.body.templates.length, 1);
+  assert.equal(tplRes.body.templates[0].name, 'Demo');
   await db.query('insert into user_projects (id,user_id,name,project) select id,owner_id,name,project from project_templates');
   const saved = await db.query('select project from user_projects where user_id=$1', [owner]);
   assert.deepEqual(saved.rows[0].project, project);
@@ -97,7 +106,7 @@ test('build API accepts 127.0.0.1 local origin, enforces 1200-char idea limit, a
     CREATE TABLE component_catalog (id TEXT PRIMARY KEY, category TEXT, status TEXT, version INTEGER, definition TEXT, updated_at TEXT);
     CREATE TABLE adafruit_products (product_id TEXT PRIMARY KEY, raw_json TEXT);
   `);
-  const seed = require('../scripts/initial-component-catalog.cjs')[0];
+  const seed = require('../scripts/initial-component-catalog.cjs').find(d => d.enabled !== false);
   db.prepare(`INSERT INTO component_catalog VALUES (?, ?, 'published', 1, ?, ?)`).run(
     seed.id, seed.category, JSON.stringify({ ...seed, needsPinoutResearch: 0 }), new Date().toISOString()
   );

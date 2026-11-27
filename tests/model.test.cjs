@@ -133,3 +133,94 @@ test('diagnostics flags common beginner hardware hazards', () => {
  assert.ok(titles.some(t => /9 V battery on 4\.8 V servo/.test(t)));
  assert.ok(titles.some(t => /missing a ground/.test(t)));
 });
+
+test('cells connect in series with voltage sum, short-circuit protection, and common ground nets', () => {
+ const registry = require('../dist/component-registry.js');
+ const original = registry.all();
+ const coinCell = {
+  id: 'cr2032', name: 'CR2032 3V Coin Cell', renderer: 'generic',
+  pins: [{ id: 'pos', name: '+', kind: 'power' }, { id: 'neg', name: '−', kind: 'ground' }]
+ };
+ const lipoCell = {
+  id: 'lipo37', name: 'Lithium Ion Polymer Battery - 3.7v 2500mAh', renderer: 'generic',
+  pins: [{ id: 'pos', name: '+', kind: 'power' }, { id: 'neg', name: '−', kind: 'ground' }]
+ };
+ const gndBus = {
+  id: 'gndRail', name: 'Ground rail', renderer: 'generic',
+  pins: ['G1', 'G2', 'G3'].map(id => ({ id, name: id, kind: 'passive-ground' })),
+  conductors: [['G1', 'G2', 'G3']]
+ };
+ try {
+  registry.replace([...original, coinCell, lipoCell, gndBus]);
+  const s = {
+   name: 'Series and Common Ground',
+   boards: [],
+   nodes: [
+    node('c1', 'cr2032', { modes: ['low', 'low'] }),
+    node('c2', 'cr2032', { modes: ['low', 'low'] }),
+    node('led', 'led'),
+    node('servo', 'servo'),
+    node('esp', 'esp8266', { modes: M.espPins.map(() => 'low') }),
+    node('rail', 'gndRail', { modes: ['low', 'low', 'low'] })
+   ],
+   wires: []
+  };
+
+  // Connect c1 (+) -> c2 (-) in series (even when passed in reverse order)
+  const wSeries = M.connection(s, { id: 'c2', pin: 1 }, { id: 'c1', pin: 0 });
+  assert.deepEqual(wSeries, { from: 'c1', pin: 0, to: 'c2', toPin: 1 });
+  s.wires.push(wSeries);
+  assert.equal(M.valid(s), true);
+  assert.equal(M.wireRole(s, wSeries), 'power');
+
+  const info = M.seriesInfo(s, 'c2');
+  assert.equal(info.count, 2);
+  assert.equal(info.position, 2);
+  assert.equal(info.totalVoltage, 6);
+  assert.equal(info.mismatched, false);
+
+  // Short-circuit loop (c2 + -> c1 -) must be rejected
+  assert.equal(M.connection(s, { id: 'c2', pin: 0 }, { id: 'c1', pin: 1 }), null);
+  // Grounding the intermediate series junction (c2 - -> c1 -) must be rejected (would short c1)
+  assert.equal(M.connection(s, { id: 'c2', pin: 1 }, { id: 'c1', pin: 1 }), null);
+  // Non-cell power (NodeMCU 3V3 pin 11) -> cell ground (c1 -) must stay rejected
+  assert.equal(M.connection(s, { id: 'esp', pin: 11 }, { id: 'c1', pin: 1 }), null);
+
+  // Common ground: NodeMCU GND (pin 12) <-> c1 (-) is allowed!
+  const wCommonGnd = M.connection(s, { id: 'esp', pin: 12 }, { id: 'c1', pin: 1 });
+  assert.ok(wCommonGnd);
+  s.wires.push(wCommonGnd);
+
+  // Daisy-chained ground-inputs: c1 (-) -> servo GND -> LED cathode grounds the LED!
+  const wServoGnd = M.connection(s, { id: 'c1', pin: 1 }, { id: 'servo', pin: 2 });
+  const wLedChain = M.connection(s, { id: 'servo', pin: 2 }, { id: 'led', pin: 1 });
+  assert.ok(wServoGnd && wLedChain);
+  s.wires.push(wServoGnd, wLedChain);
+  assert.equal(M.valid(s), true);
+  assert.ok(M.driverLookup(s)(s.nodes[2], 1)); // LED cathode is grounded via daisy chain
+
+  // Passive ground rail accepts multiple ground references (common ground bus)
+  const wRail1 = M.connection(s, { id: 'c1', pin: 1 }, { id: 'rail', pin: 0 });
+  const wRail2 = M.connection(s, { id: 'esp', pin: 12 }, { id: 'rail', pin: 1 });
+  assert.ok(wRail1 && wRail2);
+  s.wires.push(wRail1, wRail2);
+  assert.equal(M.valid(s), true);
+
+  // Mismatched + LiPo series warnings
+  const sMix = {
+   name: 'Mix',
+   boards: [],
+   nodes: [
+    node('c1', 'cr2032', { modes: ['low', 'low'] }),
+    node('c2', 'lipo37', { modes: ['low', 'low'] })
+   ],
+   wires: [{ from: 'c1', pin: 0, to: 'c2', toPin: 1 }]
+  };
+  assert.equal(M.valid(sMix), true);
+  const diagTitles = M.diagnostics(sMix).map(d => d.title);
+  assert.ok(diagTitles.some(t => /Mismatched cells/.test(t)));
+  assert.ok(diagTitles.some(t => /BMS/.test(t)));
+ } finally {
+  registry.replace(original);
+ }
+});

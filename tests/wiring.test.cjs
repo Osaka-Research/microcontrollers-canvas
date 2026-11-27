@@ -74,3 +74,28 @@ test('passive conductor wires animate when driven, show pin names, and delete in
   b.dom.window.close();
  }
 });
+
+test('dragging connects two cells in series and joins common grounds', () => {
+ const b = boot();
+ try {
+  b.run("add('battery','eneloop2');add('battery','eneloop2');addEsp8266()");
+  const c1Pos = b.pin(0, '0', 100, 100), c1Neg = b.pin(0, '1', 100, 150);
+  const c2Pos = b.pin(1, '0', 300, 100), c2Neg = b.pin(1, '1', 300, 150);
+  const espGnd = b.pin(2, '12', 500, 150);
+  // Drag Cell 1 (+) -> Cell 2 (-) in series
+  b.drag(c1Pos, [100, 100], [300, 150]);
+  assert.equal(b.run('state.wires.length'), 1);
+  // Inspector should display combined series voltage (2.4V + 2.4V = 4.8V)
+  b.run('selected=state.nodes[1].id;render()');
+  assert.match(b.$('#inspectorContent').textContent, /Series pack: 2 cells · ~4\.8 V nominal/);
+  // Dragging Cell 2 (+) -> Cell 1 (-) short-circuit is rejected
+  b.drag(c2Pos, [300, 100], [100, 150]);
+  assert.equal(b.run('state.wires.length'), 1);
+  // Common ground: Cell 1 (-) -> NodeMCU GND succeeds
+  b.drag(c1Neg, [100, 150], [500, 150]);
+  assert.equal(b.run('state.wires.length'), 2);
+  assert.ok(b.run('RobotModel.valid(state)'));
+ } finally {
+  b.dom.window.close();
+ }
+});

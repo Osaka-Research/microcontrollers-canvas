@@ -9,7 +9,9 @@
     "worker:adafruit": "node scripts/adafruit-catalog-worker.mjs",
     "worker:adafruit:status": "node scripts/adafruit-catalog-worker.mjs --status",
     "worker:templates": "node scripts/template-catalog-worker.mjs",
-    "worker:templates:status": "node scripts/template-catalog-worker.mjs --status"
+    "worker:templates:status": "node scripts/template-catalog-worker.mjs --status",
+    "worker:photos": "node scripts/photo-audit-worker.mjs",
+    "worker:photos:status": "node scripts/photo-audit-worker.mjs --status"
   },
   "dependencies": {
     "@siwc/local": "file:vendor/siwc-local"

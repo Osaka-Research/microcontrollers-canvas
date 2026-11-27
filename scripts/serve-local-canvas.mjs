@@ -73,7 +73,7 @@ async function localImage(id, res) {
   if (!absolute.startsWith(dataDir + path.sep)) return send(res, 404, { error: 'Image not found.' });
   try { await access(absolute); }
   catch { return send(res, 404, { error: 'Image not found.' }); }
-  res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=3600' });
+  res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache' });
   createReadStream(absolute).pipe(res);
 }
 

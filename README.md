@@ -61,6 +61,19 @@ npm run worker:adafruit -- --provider gemini-api --publish-supabase  # use GEMIN
 
 The worker defaults to **Gemini** (`agy` CLI with `gemini-4-neon-medium`, or `--provider gemini-api` with `GEMINI_API_KEY` and Google Search grounding), prioritizes active modern development boards and breakouts first, auto-skips obvious non-electronics (apparel, stickers, books, enclosures), validates every pin map and passive conductor group against MCC's component schema, writes verified components directly to `.research/adafruit/catalog.sqlite` (appearing in the local canvas automatically every 15 seconds), and supports graceful resume and exponential backoff on errors. For single-item inspection with Python, `python3 scripts/research-adafruit-pins.py` also remains available.
 
+### Local IRL circuit templates worker
+
+To generate real-world starter circuit templates (2WD RC car, obstacle-avoiding rover, mini drone flight core, pan-tilt gimbal, smart door latch, etc.) using your local catalog and Gemini:
+
+```sh
+npm run worker:templates:status                        # show ready / pending template counts
+npm run worker:templates -- --id rc-car-2wd            # generate one specific template
+npm run worker:templates                               # build all pending IRL templates locally
+npm run worker:templates -- --idea "Solar garden light"  # generate a custom IRL template
+```
+
+Every generated template is validated against `RobotModel.valid()` and `RobotModel.diagnostics()` (rejecting hardware hazards before saving), laid out cleanly without overlap, saved locally into `project_templates` in `.research/adafruit/catalog.sqlite` (plus `.research/local-templates.json`), and loaded automatically into the **Templates** drawer in the local canvas via `/api/templates`.
+
 
 Search results are shown as source links. The canvas uses its own component drawings rather than embedding product photos with unknown redistribution rights. The AI can build with parts already in the component library; it explains when a requested part or supporting component is missing.
 

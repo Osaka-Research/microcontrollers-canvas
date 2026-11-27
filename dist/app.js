@@ -192,6 +192,26 @@ window.refreshComponentRegistry=definitions=>{
  }
  render();
 };
+let loadedTemplates=[];
+window.refreshTemplates=templates=>{
+ loadedTemplates=Array.isArray(templates)?templates:[];
+ const drawer=$('#templatesDrawer'),list=$('#templateList'),count=$('#templateCount');
+ if(!drawer||!list||!count)return;
+ drawer.hidden=!loadedTemplates.length;
+ count.textContent=String(loadedTemplates.length);
+ list.innerHTML=loadedTemplates.map((tpl,idx)=>`<button type="button" class="template-item" data-template-idx="${idx}" title="${esc(tpl.realWorldNotes||tpl.description||tpl.name)}"><strong>${esc(tpl.name)}</strong><small>${esc(tpl.category||'TEMPLATE')}${tpl.difficulty?' · '+esc(tpl.difficulty):''} · ${tpl.project?.nodes?.length||0} parts</small></button>`).join('');
+ list.querySelectorAll('[data-template-idx]').forEach(button=>button.onclick=()=>{
+  const tpl=loadedTemplates[+button.dataset.templateIdx];
+  if(!tpl?.project)return;
+  const next=migrateProject(structuredClone(tpl.project));
+  next.boards??=[];
+  if(!valid(next))return toast('This template requires components not yet loaded in the catalog.');
+  snapshot();pendingRestore=null;state=next;selected=null;selectedWire=null;pending=null;running=false;started=false;elapsed=0;stopLoop();
+  $('#run').innerHTML='▶ <span>Run simulation</span>';$('#simLabel').textContent='Simulation stopped';$('#status').textContent='Template loaded';
+  render();$('#resetView').click();
+  toast(tpl.realWorldNotes?`Loaded ${tpl.name}. ${tpl.realWorldNotes}`:`Loaded template: ${tpl.name}. Press Run simulation.`);
+ });
+};
 window.CanvasAI={
  current(){return state.nodes.map((n,index)=>({index,id:n.id,type:n.type,label:componentLabel(n),pins:RobotModel.pins(state,n).map((p,pin)=>({pin,id:p.id,name:p.name,kind:p.kind})),conductors:ComponentRegistry.get(n.type)?.conductors}))},
  apply(plan){

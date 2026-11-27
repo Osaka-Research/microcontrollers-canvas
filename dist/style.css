@@ -232,3 +232,17 @@ main{position:relative;display:grid;grid-template-rows:minmax(0,1fr) 230px;min-w
 :root[data-theme="dark"] .pin-list-item.selected{background:#324138}
 :root[data-theme="high-contrast"] .app>.inspector{background:#000;color:#fff;border-color:#fff}
 :root[data-theme="high-contrast"] .floating-tools,:root[data-theme="high-contrast"] .zoom,:root[data-theme="high-contrast"] .reading,:root[data-theme="high-contrast"] .remove-wire,:root[data-theme="high-contrast"] .connection-select,:root[data-theme="high-contrast"] .wire-context-delete,:root[data-theme="high-contrast"] .python-script{background:#000;color:#fff;border-color:#fff}
+
+/* Starter circuit templates drawer */
+.templates-drawer{margin:0 0 14px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:8px 10px}
+.templates-drawer>summary{list-style:none;cursor:pointer;user-select:none}
+.templates-drawer>summary::-webkit-details-marker{display:none}
+#templateList{display:grid;gap:6px;margin-top:10px}
+.template-item{display:block;width:100%;text-align:left;border:1px solid var(--line);border-radius:7px;background:#fafcf9;padding:8px 9px}
+.template-item:hover{border-color:#9bbb9f;background:#f0f7f1}
+.template-item strong{display:block;font-size:11px;font-weight:600;line-height:1.3}
+.template-item small{display:block;font-size:9px;color:var(--muted);margin-top:3px}
+:root[data-theme="dark"] .templates-drawer{background:#2b2d2c;border-color:#454c48}
+:root[data-theme="dark"] .template-item{background:#252827;border-color:#424c45;color:#dbe4de}
+:root[data-theme="dark"] .template-item:hover{background:#303a34;border-color:#68a782}
+:root[data-theme="high-contrast"] .templates-drawer,:root[data-theme="high-contrast"] .template-item{background:#000;color:#fff;border-color:#fff}

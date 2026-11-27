@@ -1,7 +1,18 @@
 'use strict';
 (()=>{
  const endpoint=window.COMPONENT_CATALOG_ENDPOINT||(window.CANVAS_AI_ENDPOINT?new URL(window.CANVAS_AI_ENDPOINT,location.href).origin+'/api/components':'/api/components');
- let previous='',lastCheck=0;
+ const templatesEndpoint=new URL(endpoint,location.href).origin+'/api/templates';
+ let previous='',previousTemplates='',lastCheck=0;
+ async function refreshTemplates(){
+  try{
+   const response=await fetch(templatesEndpoint,{headers:{Accept:'application/json'},cache:'no-store'});
+   if(!response.ok)return;
+   const data=await response.json();
+   if(!Array.isArray(data.templates))return;
+   const signature=JSON.stringify(data.templates);
+   if(signature!==previousTemplates){window.refreshTemplates?.(data.templates);previousTemplates=signature}
+  }catch{}
+ }
  async function refresh(force=false){
   if(!force&&document.hidden)return;
   lastCheck=Date.now();
@@ -15,6 +26,7 @@
   }catch(error){
    if(!previous){console.info('Component catalog unavailable:',error.message);const status=document.querySelector('#noResults');if(status){status.textContent='Component catalog unavailable. Check the server and database configuration.';status.hidden=false}}
   }
+  refreshTemplates();
  }
  refresh(true);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-lastCheck>=15000)refresh(true)});

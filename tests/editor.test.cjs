@@ -30,6 +30,9 @@ test('loading a catalog restores a saved circuit and draws wires to a database p
   const meter={id:'meter',name:'Test meter',category:'Test',renderer:'generic',
     pins:[{id:'ground',name:'GND',kind:'ground-input'},{id:'signal',name:'IN',kind:'input'}]};
   w.fetch=async address=>{
+   if(address==='https://backend.example/api/templates'){
+    return Response.json({templates:[{id:'demo-tpl',name:'Demo RC Car',category:'ROBOTICS',difficulty:'Beginner',description:'Starter',realWorldNotes:'Test',project:{name:'Demo RC Car',boards:[],nodes:[node('t1','mcu')],wires:[]}}]});
+   }
    assert.equal(address,'https://backend.example/api/components');
    return Response.json({definitions:[...require('../scripts/initial-component-catalog.cjs'),meter]});
   };
@@ -41,6 +44,8 @@ test('loading a catalog restores a saved circuit and draws wires to a database p
   assert.equal($('#wires').children.length,1);
   assert.equal(run('RobotModel.valid(state)'),true);
   assert.deepEqual(JSON.parse(w.localStorage.getItem('robot-canvas-v1')).wires,JSON.parse(saved).wires);
+  assert.equal($('#templatesDrawer').hidden,false);
+  assert.equal($('#templateCount').textContent,'1');
  } finally { b.dom.window.close(); }
 });
 

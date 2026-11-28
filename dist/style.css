@@ -413,3 +413,17 @@ main{position:relative;display:grid;grid-template-rows:minmax(0,1fr) auto;min-wi
 :root[data-theme="blueprint"] .usb-flash-panel{background:#0f2b4f;border-color:#2b5f94;color:#e6f2ff}
 :root[data-theme="dark"] .usb-flash-panel{background:#292f2c;border-color:#445049;color:#dce5df}
 :root[data-theme="high-contrast"] .usb-flash-panel{background:#000;border:1px solid #fff;color:#fff}
+
+/* Prevent terminal text overlap on canvas nodes and inspector lists */
+.pin-row{height:auto;min-height:29px;gap:6px}
+.pin-row>span,.pin-row .output-state{min-width:0}
+.pin-row .output-state{flex-shrink:0;white-space:nowrap}
+.node:has(.generic-pin-row){width:220px}
+.generic-pin-row{height:auto!important;min-height:28px;padding:2px 6px}
+.generic-terminal.pin,.generic-terminal.pin.input{position:relative;left:auto!important;right:auto!important;display:flex;align-items:center;gap:7px;width:100%;height:auto;min-height:26px;padding:4px 6px;overflow:hidden}
+.generic-terminal.pin>span:not(.connection-dot){flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25}
+.generic-terminal.pin>small{flex:0 1 auto;max-width:78px;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25}
+.generic-inspector-pins{display:grid;gap:4px;margin:10px 0}
+.generic-inspector-pins>strong{font-size:9px;letter-spacing:.08em;color:var(--muted);margin-bottom:2px}
+.generic-inspector-pins>div:not(.bidirectional-pin){display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--line);font-size:10px;line-height:1.35}
+.generic-inspector-pins>div:not(.bidirectional-pin)>small{text-align:right;color:var(--muted);overflow-wrap:anywhere}

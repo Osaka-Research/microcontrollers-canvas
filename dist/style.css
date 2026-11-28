@@ -402,3 +402,14 @@ main{position:relative;display:grid;grid-template-rows:minmax(0,1fr) auto;min-wi
 .res-body .b2{background:#c93b2b}
 .res-body .b3{background:#7c4724}
 .res-body .b4{background:#d4af37}
+
+/* Web Serial USB flashing panel */
+.usb-flash-panel{margin:14px 0;padding:10px;border:1px solid var(--line);border-radius:8px;background:#f4f8f5;font-size:10px}
+.usb-flash-panel summary{cursor:pointer;font-weight:650;font-size:11px;list-style:none}
+.usb-flash-panel summary::-webkit-details-marker{display:none}
+.usb-status{margin:8px 0 6px;font-size:10px;line-height:1.45;color:var(--muted);overflow-wrap:anywhere}
+.usb-progress{width:100%;height:7px;margin:4px 0 8px;accent-color:#38bdf8}
+.usb-bin-label{display:inline-flex;align-items:center;cursor:pointer}
+:root[data-theme="blueprint"] .usb-flash-panel{background:#0f2b4f;border-color:#2b5f94;color:#e6f2ff}
+:root[data-theme="dark"] .usb-flash-panel{background:#292f2c;border-color:#445049;color:#dce5df}
+:root[data-theme="high-contrast"] .usb-flash-panel{background:#000;border:1px solid #fff;color:#fff}

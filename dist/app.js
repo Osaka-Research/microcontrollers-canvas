@@ -170,6 +170,24 @@ function peripheralHTML(n) {
     const packPhoto = pack.assetUrl || photoUrl;
     return `<div class="node-body ${packPhoto ? 'generic-art' : ''}">${componentArtHTML(definition, packPhoto, `<span class="battery-art ${n.pack === 'nineVolt' ? 'battery-9v' : ''}"><i></i><b>${esc(pack.cells)}</b></span>`)}</div><div class="pin-row battery-pin-row"><span>${esc(pack.positive || 'V+ · POSITIVE')}</span><button class="pin" data-pin="0" aria-label="Battery positive power output"></button></div><div class="pin-row battery-pin-row"><span>${esc(pack.negative || 'GND · NEGATIVE')}</span><button class="pin" data-pin="1" aria-label="Battery ground output"></button></div><small class="battery-rating">${esc(pack.voltage)} · ${esc(pack.capacity)}</small>`;
   }
+  if (n.type === 'pushbutton') {
+    const active = !!(n.pressed || n.latched);
+    return `<div class="node-body interactive-body"><button type="button" class="tactile-cap ${active ? 'pressed' : ''}" data-pushbutton="${esc(n.id)}" aria-pressed="${active}" title="Hold to press button"><span>${active ? 'HIGH' : 'PRESS'}</span></button></div><div class="pin-row battery-pin-row"><span>OUT <small>DIGITAL</small></span><button class="pin" data-pin="0" aria-label="Pushbutton digital output"></button></div><div class="pin-row component-pin-row"><button class="pin input" data-pin="1" aria-label="Pushbutton ground"></button><span>GND</span><span class="output-state">${active ? 'PRESSED' : 'OPEN'}</span></div>`;
+  }
+  if (n.type === 'potentiometer') {
+    const val = Math.max(0, Math.min(1, n.value ?? 0.5));
+    const pct = Math.round(val * 100);
+    const deg = Math.round(-135 + val * 270);
+    return `<div class="node-body interactive-body pot-body"><div class="pot-dial" style="--dial-deg:${deg}deg" aria-hidden="true"><i></i></div><input type="range" class="pot-slider" data-pot="${esc(n.id)}" min="0" max="100" step="1" value="${pct}" aria-label="Potentiometer position"><small class="pot-readout">${pct}% · ${(val * 3.3).toFixed(2)}V</small></div><div class="pin-row component-pin-row"><button class="pin input" data-pin="0" aria-label="Potentiometer VCC"></button><span>VCC</span><span></span></div><div class="pin-row battery-pin-row"><span>WIPER <small>ANALOG</small></span><button class="pin" data-pin="1" aria-label="Potentiometer wiper analog output"></button></div><div class="pin-row component-pin-row"><button class="pin input" data-pin="2" aria-label="Potentiometer GND"></button><span>GND</span><span class="output-state">ADC ${Math.round(val * 1024)}</span></div>`;
+  }
+  if (n.type === 'buzzer') {
+    return `<div class="node-body"><span class="buzzer-disc" aria-hidden="true"><i></i></span></div><div class="pin-row component-pin-row"><button class="pin input" data-pin="0" aria-label="Buzzer signal input"></button><span>SIGNAL <small>+ PWM</small></span><span class="output-state">SILENT</span></div><div class="pin-row component-pin-row"><button class="pin input" data-pin="1" aria-label="Buzzer ground"></button><span>GND <small>−</small></span><span></span></div>`;
+  }
+  if (n.type === 'resistor') {
+    const ohms = n.ohms ?? 220;
+    const label = ohms >= 1000 ? `${ohms / 1000} kΩ` : `${ohms} Ω`;
+    return `<div class="node-body"><div class="resistor-art" aria-hidden="true"><span class="res-lead"></span><span class="res-body"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i></span><span class="res-lead"></span></div></div><div class="pin-row component-pin-row"><button class="pin input" data-pin="0" aria-label="Resistor lead A"></button><span>LEAD A</span><span class="output-state">${esc(label)}</span></div><div class="pin-row battery-pin-row"><span>LEAD B</span><button class="pin" data-pin="1" aria-label="Resistor lead B"></button></div>`;
+  }
   const indicator = n.type === 'led' ? '<span class="light"></span>' : n.type === 'motor' ? '<span class="rotor">✣</span>' : '<span class="arm"></span>';
   const body = photoUrl
     ? `<div class="node-body generic-art has-live-indicator">${componentArtHTML(definition, photoUrl, '')}<span class="live-indicator">${indicator}</span></div>`
@@ -282,10 +300,70 @@ function updateWirePaths(nodeId) {
   });
 }
 
+// Web Audio API synthesizer for live piezo buzzer tones (silences automatically when paused or disconnected).
+const BuzzerAudio = (() => {
+  let ctx = null;
+  const voices = new Map();
+  function ensureCtx() {
+    const Ctor = globalThis.AudioContext || globalThis.webkitAudioContext;
+    if (!Ctor) return null;
+    if (!ctx) ctx = new Ctor();
+    if (ctx.state === 'suspended') ctx.resume?.().catch?.(() => {});
+    return ctx;
+  }
+  function set(id, active, freqHz) {
+    if (!active || !running) {
+      const v = voices.get(id);
+      if (v) {
+        try { v.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.01); v.osc.stop(ctx.currentTime + 0.04); } catch {}
+        voices.delete(id);
+      }
+      return;
+    }
+    const audio = ensureCtx();
+    if (!audio) return;
+    const hz = Math.max(80, Math.min(8000, Number(freqHz) || 880));
+    let v = voices.get(id);
+    if (!v) {
+      const osc = audio.createOscillator();
+      const gain = audio.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(hz, audio.currentTime);
+      gain.gain.setValueAtTime(0.035, audio.currentTime);
+      osc.connect(gain);
+      gain.connect(audio.destination);
+      osc.start();
+      v = { osc, gain };
+      voices.set(id, v);
+    } else {
+      try { v.osc.frequency.setTargetAtTime(hz, audio.currentTime, 0.015); } catch {}
+    }
+  }
+  function prune(activeIds) {
+    for (const id of [...voices.keys()]) {
+      if (!activeIds.has(id)) set(id, false, 0);
+    }
+  }
+  return { set, prune };
+})();
+
+function servoAngleFromMeta(meta) {
+  if (!meta) return 0;
+  if (meta.freq >= 30 && meta.freq <= 100 && meta.pulseUs >= 350 && meta.pulseUs <= 2700) {
+    return Math.max(0, Math.min(180, Math.round(((meta.pulseUs - 500) / 2000) * 180)));
+  }
+  if (meta.freq > 0) {
+    return Math.max(0, Math.min(180, Math.round(meta.duty * 180)));
+  }
+  return meta.high ? 180 : 0;
+}
+
 function updateSignals() {
   const driver = RobotModel.driverLookup(state);
   const out = (n, p) => RobotModel.output(state, n, p, started, elapsed, window.Firmware?.read, driver);
   const readIn = (n, p) => RobotModel.input(state, n, p, started, elapsed, window.Firmware?.read, driver);
+  const metaIn = (n, p) => RobotModel.signalMeta(state, n, p, started, elapsed, window.Firmware?.read, window.Firmware?.pwm, driver);
+  const buzzerIds = new Set();
   for (const n of state.nodes) {
     const el = document.querySelector(`[data-id="${n.id}"]`);
     if (!el) continue;
@@ -294,10 +372,44 @@ function updateSignals() {
         p.textContent = (RobotModel.kind(state, n, p.dataset.pin) === 'input' ? readIn(n, +p.dataset.pin) : out(n, +p.dataset.pin)) ? 'HIGH' : 'LOW';
       });
       el.querySelectorAll('.pin').forEach(p => {
-        p.classList.toggle('high', RobotModel.kind(state, n, p.dataset.pin) === 'input' ? readIn(n, +p.dataset.pin) : out(n, +p.dataset.pin));
+        const idx = +p.dataset.pin;
+        const k = RobotModel.kind(state, n, idx);
+        const pwm = k === 'output' && window.Firmware?.pwm ? window.Firmware.pwm(n, idx) : null;
+        p.classList.toggle('high', k === 'input' ? readIn(n, idx) : (pwm && pwm.freq > 0 ? pwm.duty > 0.01 : out(n, idx)));
       });
     } else if (n.type === 'battery') {
       el.querySelectorAll('.pin').forEach(p => p.classList.toggle('high', out(n, +p.dataset.pin)));
+    } else if (n.type === 'pushbutton') {
+      const active = !!(n.pressed || n.latched);
+      el.querySelector('.tactile-cap')?.classList.toggle('pressed', active);
+      const capSpan = el.querySelector('.tactile-cap span');
+      if (capSpan) capSpan.textContent = active ? 'HIGH' : 'PRESS';
+      el.querySelector('.pin[data-pin="0"]')?.classList.toggle('high', started && active);
+      el.querySelector('.pin[data-pin="1"]')?.classList.toggle('high', !!driver(n, 1));
+      const st = el.querySelector('.output-state');
+      if (st) st.textContent = active ? 'PRESSED' : 'OPEN';
+    } else if (n.type === 'potentiometer') {
+      const val = Math.max(0, Math.min(1, n.value ?? 0.5));
+      el.querySelector('.pin[data-pin="0"]')?.classList.toggle('high', readIn(n, 0));
+      el.querySelector('.pin[data-pin="1"]')?.classList.toggle('high', started && val > 0.05);
+      el.querySelector('.pin[data-pin="2"]')?.classList.toggle('high', !!driver(n, 2));
+      const st = el.querySelector('.output-state');
+      if (st) st.textContent = `ADC ${Math.round(val * 1024)}`;
+    } else if (n.type === 'resistor') {
+      const active = readIn(n, 0) || readIn(n, 1);
+      el.querySelectorAll('.pin').forEach(p => p.classList.toggle('high', active));
+    } else if (n.type === 'buzzer') {
+      buzzerIds.add(n.id);
+      const hasGnd = !!driver(n, 1);
+      const m = metaIn(n, 0);
+      const active = started && hasGnd && (m.freq > 0 ? m.duty > 0.01 : m.high);
+      const toneHz = m.freq > 0 ? m.freq : 880;
+      el.querySelector('.pin[data-pin="0"]')?.classList.toggle('high', active);
+      el.querySelector('.pin[data-pin="1"]')?.classList.toggle('high', hasGnd);
+      el.querySelector('.buzzer-disc')?.classList.toggle('on', active);
+      const st = el.querySelector('.output-state');
+      if (st) st.textContent = active ? `${toneHz} Hz` : 'SILENT';
+      BuzzerAudio.set(n.id, active && !n.muted, toneHz);
     } else if (ComponentRegistry.get(n.type)?.renderer === 'generic') {
       el.querySelectorAll('.pin').forEach(p => {
         const i = +p.dataset.pin;
@@ -314,13 +426,20 @@ function updateSignals() {
       const hasPin = p => !!driver(n, p);
       let high = false;
       let label = '';
+      let servoDeg = 0;
+      let ledBrightness = 0;
       if (n.type === 'servo') {
-        high = readIn(n, 0);
-        label = high ? '180°' : '0°';
+        const m = metaIn(n, 0);
+        servoDeg = servoAngleFromMeta(m);
+        high = servoDeg > 0;
+        label = `${servoDeg}°`;
       } else if (n.type === 'led') {
-        high = readIn(n, 0) && hasPin(1);
-        label = high ? 'ON' : 'OFF';
-        el.querySelector('.pin[data-pin="1"]')?.classList.toggle('high', hasPin(1));
+        const m = metaIn(n, 0);
+        const grounded = hasPin(1);
+        ledBrightness = grounded ? (m.freq > 0 ? m.duty : (m.high ? 1 : 0)) : 0;
+        high = ledBrightness > 0.01;
+        label = !high ? 'OFF' : (m.freq > 0 ? `${Math.round(ledBrightness * 100)}%` : 'ON');
+        el.querySelector('.pin[data-pin="1"]')?.classList.toggle('high', grounded);
       } else if (n.type === 'motor') {
         const a = readIn(n, 0);
         const b = readIn(n, 1);
@@ -330,11 +449,17 @@ function updateSignals() {
       }
       el.querySelector('.pin[data-pin="0"],.pin[data-pin="in"]')?.classList.toggle('high', n.type === 'motor' ? readIn(n, 0) : high);
       el.querySelector('.output-state').textContent = label;
-      el.querySelector('.light,.rotor')?.classList.toggle('on', high);
+      const lightEl = el.querySelector('.light');
+      if (lightEl) {
+        lightEl.classList.toggle('on', high);
+        lightEl.style.opacity = high ? String(0.35 + ledBrightness * 0.65) : '';
+      }
+      el.querySelector('.rotor')?.classList.toggle('on', high);
       if (n.type === 'motor') el.querySelector('.rotor').style.animationPlayState = running ? 'running' : 'paused';
-      if (n.type === 'servo') el.querySelector('.arm').style.transform = `rotate(${high ? 180 : 0}deg)`;
+      if (n.type === 'servo') el.querySelector('.arm').style.transform = `rotate(${servoDeg}deg)`;
     }
   }
+  BuzzerAudio.prune(buzzerIds);
   document.querySelectorAll('.wire').forEach(p => {
     const w = state.wires.find(w => RobotModel.attachmentKey(state, w) === p.dataset.target);
     const fromNode = w && state.nodes.find(n => n.id === w.from);
@@ -349,10 +474,27 @@ function updateSignals() {
   if (n && !isController(n) && $('#reading')) {
     const pack = RobotModel.isCell(state, n) ? RobotModel.seriesInfo(state, n.id) : null;
     let reading = pack ? `Series pack: ${pack.count} cells${pack.totalVoltage ? ` · ~${pack.totalVoltage} V nominal` : ''} (cell ${pack.position} of ${pack.count})` : 'Power source';
-    if (!started && !pack) reading = 'Simulation stopped';
-    else if (n.type === 'servo') reading = !started ? 'Simulation stopped' : `Position: ${readIn(n, 0) ? 180 : 0}°`;
-    else if (n.type === 'led') reading = !started ? 'Simulation stopped' : (readIn(n, 0) && !!driver(n, 1)) ? 'LED on (signal high; cathode grounded)' : 'LED off (needs signal and ground)';
-    else if (n.type === 'motor') reading = !started ? 'Simulation stopped' : (!driver(n, 0) || !driver(n, 1)) ? 'Connect both motor terminals' : readIn(n, 0) === readIn(n, 1) ? 'Motor stopped (both terminals at same logic level)' : `Motor ${readIn(n, 0) ? 'forward' : 'reverse'} (logic model)`;
+    if (!started && !pack && !['pushbutton', 'potentiometer', 'resistor'].includes(n.type)) reading = 'Simulation stopped';
+    else if (n.type === 'pushbutton') reading = (n.pressed || n.latched) ? 'Switch closed (OUT = HIGH)' : 'Switch open (OUT = LOW)';
+    else if (n.type === 'potentiometer') {
+      const val = Math.max(0, Math.min(1, n.value ?? 0.5));
+      reading = `${Math.round(val * 100)}% · ${(val * 3.3).toFixed(2)} V · ADC ~${Math.round(val * 1024)} / 1024`;
+    } else if (n.type === 'resistor') {
+      const ohms = n.ohms ?? 220;
+      reading = `Series resistance: ${ohms >= 1000 ? `${ohms / 1000} kΩ` : `${ohms} Ω`}`;
+    } else if (n.type === 'buzzer') {
+      const m = metaIn(n, 0);
+      const active = started && !!driver(n, 1) && (m.freq > 0 ? m.duty > 0.01 : m.high);
+      reading = !started ? 'Simulation stopped' : !driver(n, 1) ? 'Connect GND − to ground' : active ? `Playing ${m.freq > 0 ? m.freq : 880} Hz${n.muted ? ' (muted)' : ''}` : 'Silent (awaiting HIGH or PWM)';
+    } else if (n.type === 'servo') {
+      const m = metaIn(n, 0);
+      const deg = servoAngleFromMeta(m);
+      reading = !started ? 'Simulation stopped' : m.freq > 0 ? `Position: ${deg}° (PWM ${m.freq} Hz · ${m.pulseUs} µs)` : `Position: ${deg}°`;
+    } else if (n.type === 'led') {
+      const m = metaIn(n, 0);
+      const grounded = !!driver(n, 1);
+      reading = !started ? 'Simulation stopped' : (grounded && (m.freq > 0 ? m.duty > 0.01 : m.high)) ? (m.freq > 0 ? `LED dimmed ${Math.round(m.duty * 100)}% (PWM ${m.freq} Hz)` : 'LED on (signal high; cathode grounded)') : 'LED off (needs signal and ground)';
+    } else if (n.type === 'motor') reading = !started ? 'Simulation stopped' : (!driver(n, 0) || !driver(n, 1)) ? 'Connect both motor terminals' : readIn(n, 0) === readIn(n, 1) ? 'Motor stopped (both terminals at same logic level)' : `Motor ${readIn(n, 0) ? 'forward' : 'reverse'} (logic model)`;
     else if (n.type === 'ultrasonic') {
       const dist = n.distanceCm ?? 40;
       const echoHigh = out(n, 2);
@@ -567,16 +709,51 @@ function inspector() {
     return;
   }
   const sonarDist = n?.distanceCm ?? 40;
+  const potPct = Math.round(Math.max(0, Math.min(1, n?.value ?? 0.5)) * 100);
+  const resOhms = n?.ohms ?? 220;
   const pack = n?.type === 'battery' ? batteryInfo(n) : null;
   const helpText = pack
     ? `${pack.description || ''} Connect V+ and GND only to a load with a matching voltage rating. This canvas does not simulate voltage under load, charging, or current.`
     : (def?.help || 'Component loaded from catalog. Review manufacturer documentation before wiring real hardware.');
+  const extraControls = n?.type === 'ultrasonic'
+    ? `<label class="field-label" for="sonarDistance">Simulated target: <span id="sonarDistanceText">${sonarDist}</span> cm (~<span id="sonarPulseText">${Math.round(sonarDist * 58)}</span> µs)</label><input class="range" id="sonarDistance" type="range" min="2" max="400" step="1" value="${sonarDist}">`
+    : n?.type === 'pushbutton'
+      ? `<label class="signal-row"><span>Latch switch (stay HIGH)</span><input type="checkbox" id="buttonLatch" ${n.latched ? 'checked' : ''}></label>`
+      : n?.type === 'potentiometer'
+        ? `<label class="field-label" for="potInspectRange">Wiper position: <span id="potInspectText">${potPct}%</span></label><input class="range" id="potInspectRange" type="range" min="0" max="100" step="1" value="${potPct}">`
+        : n?.type === 'buzzer'
+          ? `<label class="signal-row"><span>Mute speaker audio</span><input type="checkbox" id="buzzerMute" ${n.muted ? 'checked' : ''}></label>`
+          : n?.type === 'resistor'
+            ? `<label class="signal-row"><span>Resistance</span><select id="resistorOhms">${[220, 330, 1000, 4700, 10000].map(v => `<option value="${v}" ${resOhms === v ? 'selected' : ''}>${v >= 1000 ? (v / 1000) + ' kΩ' : v + ' Ω'}</option>`).join('')}</select></label>`
+            : '';
   $('#inspectorContent').innerHTML = n
-    ? `<h2 class="inspect-name">${esc(componentLabel(n))}</h2><div class="inspect-type">${esc(def?.category || 'Component')}</div>${n.type === 'mcu' ? `<label class="field-label">OUTPUT BEHAVIOR</label>${n.modes.map((m, p) => `<label class="signal-row">D${p}<select data-mode="${p}" aria-label="D${p} behavior"><option value="low" ${m === 'low' ? 'selected' : ''}>Low</option><option value="high" ${m === 'high' ? 'selected' : ''}>High</option><option value="blink" ${m === 'blink' ? 'selected' : ''}>Pulse</option></select></label>`).join('')}<label class="field-label" for="period">Pulse cycle: <span id="periodText">${n.period.toFixed(1)}</span>s</label><input class="range" id="period" type="range" min="0.2" max="5" step="0.1" value="${n.period}"><p class="inspect-help">${esc(helpText)}</p>` : `<div class="reading" id="reading"></div>${n.type === 'ultrasonic' ? `<label class="field-label" for="sonarDistance">Simulated target: <span id="sonarDistanceText">${sonarDist}</span> cm (~<span id="sonarPulseText">${Math.round(sonarDist * 58)}</span> µs)</label><input class="range" id="sonarDistance" type="range" min="2" max="400" step="1" value="${sonarDist}">` : ''}<p class="inspect-help">${esc(helpText)}</p>${sourceLinksHTML(def, pack?.source)}${state.wires.some(w => w.to === n.id || w.from === n.id) ? '<button class="remove-wire" id="disconnect">Disconnect all</button>' : ''}`}<button class="remove-wire" id="removeSelected">Remove component</button>`
+    ? `<h2 class="inspect-name">${esc(componentLabel(n))}</h2><div class="inspect-type">${esc(def?.category || 'Component')}</div>${n.type === 'mcu' ? `<label class="field-label">OUTPUT BEHAVIOR</label>${n.modes.map((m, p) => `<label class="signal-row">D${p}<select data-mode="${p}" aria-label="D${p} behavior"><option value="low" ${m === 'low' ? 'selected' : ''}>Low</option><option value="high" ${m === 'high' ? 'selected' : ''}>High</option><option value="blink" ${m === 'blink' ? 'selected' : ''}>Pulse</option></select></label>`).join('')}<label class="field-label" for="period">Pulse cycle: <span id="periodText">${n.period.toFixed(1)}</span>s</label><input class="range" id="period" type="range" min="0.2" max="5" step="0.1" value="${n.period}"><p class="inspect-help">${esc(helpText)}</p>` : `<div class="reading" id="reading"></div>${extraControls}<p class="inspect-help">${esc(helpText)}</p>${sourceLinksHTML(def, pack?.source)}${state.wires.some(w => w.to === n.id || w.from === n.id) ? '<button class="remove-wire" id="disconnect">Disconnect all</button>' : ''}`}<button class="remove-wire" id="removeSelected">Remove component</button>`
     : '<div class="inspect-empty"><span class="inspect-icon">⌗</span><strong>Nothing selected</strong><p>Select a component on the canvas to see its properties.</p></div>';
   connectionInspector(n);
   if (!n) return;
   document.querySelectorAll('[data-mode]').forEach(s => s.onchange = () => { snapshot(); n.modes[+s.dataset.mode] = s.value; save(); updateSignals(); });
+  if ($('#buttonLatch')) $('#buttonLatch').onchange = e => { snapshot(); n.latched = !!e.target.checked; save(); updateSignals(); window.Firmware?.sendInputs(); };
+  if ($('#potInspectRange')) {
+    $('#potInspectRange').onpointerdown = () => snapshot();
+    $('#potInspectRange').oninput = e => {
+      n.value = Number(e.target.value) / 100;
+      $('#potInspectText').textContent = `${e.target.value}%`;
+      const nodeEl = document.querySelector(`[data-id="${n.id}"]`);
+      if (nodeEl) {
+        const slider = nodeEl.querySelector('.pot-slider');
+        if (slider) slider.value = e.target.value;
+        const dial = nodeEl.querySelector('.pot-dial');
+        if (dial) dial.style.setProperty('--dial-deg', `${Math.round(-135 + n.value * 270)}deg`);
+        const readout = nodeEl.querySelector('.pot-readout');
+        if (readout) readout.textContent = `${e.target.value}% · ${(n.value * 3.3).toFixed(2)}V`;
+      }
+      save();
+      updateSignals();
+      window.Firmware?.sendInputs();
+    };
+  }
+  if ($('#buzzerMute')) $('#buzzerMute').onchange = e => { snapshot(); n.muted = !!e.target.checked; save(); updateSignals(); };
+  if ($('#resistorOhms')) $('#resistorOhms').onchange = e => { snapshot(); n.ohms = Number(e.target.value); render(); };
   if ($('#period')) {
     $('#period').onpointerdown = () => snapshot();
     $('#period').onkeydown = e => { if (e.key.startsWith('Arrow')) snapshot(); };
@@ -732,7 +909,7 @@ function connect(id, pin) {
 
 let drag = null;
 viewport.addEventListener('pointerdown', e => {
-  if (e.button !== 0 || e.target.closest('button,.wire,#empty,.zoom,.floating-tools')) return;
+  if (e.button !== 0 || e.target.closest('button,input,select,.wire,#empty,.zoom,.floating-tools')) return;
   const el = e.target.closest('.node');
   if (el) {
     hideConnectionDelete();
@@ -1132,6 +1309,48 @@ if ($('#saveProjectBtn')) $('#saveProjectBtn').onclick = saveProjectToServer;
 if ($('#openProjectsBtn')) $('#openProjectsBtn').onclick = openProjectsDialog;
 if ($('#closeProjectsDialog')) $('#closeProjectsDialog').onclick = () => $('#projectsDialog')?.close();
 if ($('#projectsDialog')) $('#projectsDialog').addEventListener('click', e => { if (e.target === $('#projectsDialog')) $('#projectsDialog').close(); });
+
+// Interactive canvas controls: tactile pushbutton press/hold and potentiometer knob/slider.
+$('#nodes').addEventListener('pointerdown', e => {
+  const cap = e.target.closest('.tactile-cap[data-pushbutton]');
+  if (!cap) return;
+  e.stopPropagation();
+  const n = state.nodes.find(item => item.id === cap.dataset.pushbutton);
+  if (!n) return;
+  n.pressed = true;
+  updateSignals();
+  window.Firmware?.sendInputs();
+});
+for (const ev of ['pointerup', 'pointercancel']) {
+  window.addEventListener(ev, () => {
+    let changed = false;
+    for (const n of state.nodes) {
+      if (n.type === 'pushbutton' && n.pressed) { n.pressed = false; changed = true; }
+    }
+    if (changed) { updateSignals(); window.Firmware?.sendInputs(); }
+  });
+}
+$('#nodes').addEventListener('input', e => {
+  const slider = e.target.closest('.pot-slider[data-pot]');
+  if (!slider) return;
+  e.stopPropagation();
+  const n = state.nodes.find(item => item.id === slider.dataset.pot);
+  if (!n) return;
+  n.value = Number(slider.value) / 100;
+  const body = slider.closest('.pot-body');
+  if (body) {
+    body.querySelector('.pot-dial')?.style.setProperty('--dial-deg', `${Math.round(-135 + n.value * 270)}deg`);
+    const readout = body.querySelector('.pot-readout');
+    if (readout) readout.textContent = `${slider.value}% · ${(n.value * 3.3).toFixed(2)}V`;
+  }
+  if (selected === n.id && $('#potInspectRange')) {
+    $('#potInspectRange').value = slider.value;
+    $('#potInspectText').textContent = `${slider.value}%`;
+  }
+  save();
+  updateSignals();
+  window.Firmware?.sendInputs();
+});
 
 const photoDialog = $('#componentPhotoDialog');
 $('#nodes').addEventListener('click', e => {

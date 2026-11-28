@@ -169,7 +169,8 @@
       // XTAL freq (40 vs 26 MHz).  Report done with a count consistent with a
       // 26 MHz crystal so clock setup completes (UART bypasses real cycle timing).
       if (a === 0x60000370) return (0x80000000 | 0x0000c000) >>> 0;
-      // FRC2_COUNT (0x60000624): the free-running up-counter the SDK's os_timer list runs on.
+      // FRC1_COUNT (0x60000604) & FRC2_COUNT (0x60000624): hardware timers.
+      if (a === FRC1_COUNT) return frc1Count();
       if (a === FRC2_COUNT) return frc2Count();
       return peri[(a - PERI_LOW) >> 2] >>> 0;      // default: RAM-backed
     }
@@ -182,6 +183,20 @@
       return (((gpioOut & gpioEnable) | (~gpioEnable & ((pulled & ~externalMask) | (externalValue & externalMask)))) & 0xffff) >>> 0;
     }
 
+    // ---- FRC1: LOAD 0x600, COUNT 0x604, CTRL 0x608 (enable bit 7, autoload bit 6, prescale bits 3:2),
+    // INT 0x60C. Down-counter used by MicroPython machine.PWM (interrupt source 9).
+    var FRC1_LOAD = 0x60000600, FRC1_COUNT = 0x60000604, FRC1_CTRL = 0x60000608, FRC1_INT = 0x6000060C;
+    var frc1Start = 0, frc1At = 0, frc1Armed = false;
+    function frc1Div() { var p = (peri[(FRC1_CTRL - PERI_LOW) >> 2] >>> 2) & 3; return p === 0 ? 1 : p === 1 ? 16 : 256; }
+    function frc1Running() { return (peri[(FRC1_CTRL - PERI_LOW) >> 2] & 0x80) !== 0; }
+    function frc1Autoload() { return (peri[(FRC1_CTRL - PERI_LOW) >> 2] & 0x40) !== 0; }
+    function frc1Count() {
+      if (!frc1Running()) return frc1Start & 0x7fffff;
+      var elapsed = Math.floor((cycles - frc1At) / frc1Div());
+      var rem = frc1Start - elapsed;
+      return (rem > 0 ? rem : 0) & 0x7fffff;
+    }
+
     // ---- FRC2: LOAD 0x620, COUNT 0x624, CTRL 0x628 (enable bit 7, prescale in bits 3:2),
     // INT 0x62C, ALARM 0x630. Counts up from the last LOAD and interrupts (source 10) on reaching
     // ALARM; the SDK's os_timer list reprograms ALARM for its next expiry each time.
@@ -192,12 +207,21 @@
     function frc2Count() { return frc2Running() ? (frc2Start + Math.floor((cycles - frc2At) / frc2Div())) >>> 0 : frc2Start >>> 0; }
     function frc2Set(v) { frc2Start = v >>> 0; frc2At = cycles; }
 
+    var adcLevel = 0;
+    function applyAdcRegs() {
+      var sar = Math.max(0, Math.min(2047, Math.round(2047 - adcLevel * 1877)));
+      for (var i = 0; i < 8; i++) peri[((0x60000d80 + i * 4) - PERI_LOW) >> 2] = sar;
+    }
+
     function periWrite(a, v) {
       a = a >>> 0; v = v >>> 0;
       if (a >= UART0_BASE && a < UART0_BASE + 0x100) {
         var o = a - UART0_BASE;
         if (o === 0x00) { if (sys.onUartTx) sys.onUartTx(v & 0xff); return; }     // UART_FIFO (TX)
       }
+      if (a === FRC1_LOAD) { frc1Start = v & 0x7fffff; frc1At = cycles; frc1Armed = true; peri[(a - PERI_LOW) >> 2] = frc1Start; return; }
+      if (a === FRC1_CTRL) { var c1 = frc1Count(); peri[(a - PERI_LOW) >> 2] = v; frc1Start = c1; frc1At = cycles; if (v & 0x80) frc1Armed = true; return; }
+      if (a === FRC1_INT) { peri[(a - PERI_LOW) >> 2] = 0; return; }
       if (a === FRC2_LOAD) { frc2Set(v); peri[(a - PERI_LOW) >> 2] = v; return; }
       if (a === FRC2_CTRL) { var c = frc2Count(); peri[(a - PERI_LOW) >> 2] = v; frc2Set(c); return; }
       if (a === FRC2_ALARM) { peri[(a - PERI_LOW) >> 2] = v; frc2Armed = true; return; }
@@ -212,12 +236,12 @@
       if (a === HSPI_BASE) { peri[(a - PERI_LOW) >> 2] = 0; return; }
       if (a >= GPIO_BASE && a < GPIO_BASE + 0x100) {
         var g = a - GPIO_BASE;
-        if (g === 0x00) { gpioOut = v; return; }              // GPIO_OUT
-        if (g === 0x04) { gpioOut |= v; return; }             // GPIO_OUT_W1TS
-        if (g === 0x08) { gpioOut &= ~v; return; }            // GPIO_OUT_W1TC
-        if (g === 0x0C) { gpioEnable = v; return; }           // GPIO_ENABLE
-        if (g === 0x10) { gpioEnable |= v; return; }          // GPIO_ENABLE_W1TS
-        if (g === 0x14) { gpioEnable &= ~v; return; }         // GPIO_ENABLE_W1TC
+        if (g === 0x00) { gpioOut = v; if (sys.onGpioChange) sys.onGpioChange(gpioOut >>> 0, gpioEnable >>> 0, cycles / 80); return; }              // GPIO_OUT
+        if (g === 0x04) { gpioOut |= v; if (sys.onGpioChange) sys.onGpioChange(gpioOut >>> 0, gpioEnable >>> 0, cycles / 80); return; }             // GPIO_OUT_W1TS
+        if (g === 0x08) { gpioOut &= ~v; if (sys.onGpioChange) sys.onGpioChange(gpioOut >>> 0, gpioEnable >>> 0, cycles / 80); return; }            // GPIO_OUT_W1TC
+        if (g === 0x0C) { gpioEnable = v; if (sys.onGpioChange) sys.onGpioChange(gpioOut >>> 0, gpioEnable >>> 0, cycles / 80); return; }           // GPIO_ENABLE
+        if (g === 0x10) { gpioEnable |= v; if (sys.onGpioChange) sys.onGpioChange(gpioOut >>> 0, gpioEnable >>> 0, cycles / 80); return; }          // GPIO_ENABLE_W1TS
+        if (g === 0x14) { gpioEnable &= ~v; if (sys.onGpioChange) sys.onGpioChange(gpioOut >>> 0, gpioEnable >>> 0, cycles / 80); return; }         // GPIO_ENABLE_W1TC
       }
       // default: RAM-backed (UART config, FRC1/FRC2 timers + watchdog feeds, the
       // WiFi FE/BB/RTC radio+clock windows -> HLE stubs; the WDT never fires)
@@ -728,8 +752,10 @@
       AR.fill(0); pc = 0; sar = 0; windowbase = 0; windowstart = 1; ps = 0x40000;
       lbeg = 0; lend = 0; lcount = 0; epc1 = 0; excsave1 = 0; exccause = 0; excvaddr = 0; intenable = 0;
       cycles = 0; instret = 0; halted = false; cpuMul = 1; insnScale = 1; perInsn = 1; ccountAdj = 0;
+      frc1Start = 0; frc1At = 0; frc1Armed = false;
       frc2Start = 0; frc2At = 0; frc2Armed = false;
       gpioOut = 0; gpioEnable = 0; rxfifo.length = 0; peri.fill(0);
+      applyAdcRegs();
       if (rtcRegs) peri.set(rtcRegs, (RTC_BASE - PERI_LOW) >> 2);
       // eFuse / OTP defaults so the SDK chip-ID guard passes and the derived MAC
       // is a valid 18:FE:34:AB:CD:EF (Espressif OUI).  word2 bit15 = genuine flag.
@@ -755,8 +781,15 @@
     sys.setCpuMhz = function (m) { cpuMul = m >= 160 ? 2 : 1; perInsn = insnScale / cpuMul; };
     sys.setInsnScale = function (k) { insnScale = k; perInsn = insnScale / cpuMul; };
     sys.getInstret = function () { return instret; };
+    sys.frc1Due = function () { return frc1Armed && frc1Running() && (cycles - frc1At) >= frc1Start * frc1Div(); };
+    sys.frc1Ack = function () {
+      if (frc1Autoload()) { frc1Start = peri[(FRC1_LOAD - PERI_LOW) >> 2] & 0x7fffff; frc1At = cycles; }
+      else { frc1Armed = false; }
+    };
     sys.frc2Due = function () { return frc2Armed && frc2Running() && ((frc2Count() - peri[(FRC2_ALARM - PERI_LOW) >> 2]) | 0) >= 0; };
     sys.frc2Ack = function () { frc2Armed = false; };
+    sys.setAdc = function (value01) { adcLevel = Math.max(0, Math.min(1, Number(value01) || 0)); applyAdcRegs(); };
+    sys.onGpioChange = null;
     sys.isHalted = function () { return halted; };
     sys.ar = ar; sys.setAr = setAr;
     // live special-register accessors for the debugger (read + write-back)

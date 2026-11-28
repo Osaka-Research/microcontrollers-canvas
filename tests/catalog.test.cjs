@@ -65,7 +65,7 @@ test('seed, catalog API, build API and project tables use the migrated database'
   await import('../scripts/seed-component-catalog.mjs');
   const seeded = await request(components, 'GET');
   assert.equal(seeded.statusCode, 200);
-  assert.equal(seeded.body.definitions.length, 8);
+  assert.equal(seeded.body.definitions.length, 12);
   assert.equal(seeded.body.definitions.find(def => def.id === 'battery').variants.length, 5);
   const built = await request(build, 'POST', { action: 'build', apiKey: 'local-test-placeholder-key', idea: 'Add a test part', context: {} });
   assert.equal(built.statusCode, 200);

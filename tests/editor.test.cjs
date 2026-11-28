@@ -39,7 +39,7 @@ test('loading a catalog restores a saved circuit and draws wires to a database p
   run(loader);
   await new Promise(setImmediate);
   assert.equal($('#projectName').value,'Saved circuit');
-  assert.equal($('#libraryCount').textContent,'12');
+  assert.equal($('#libraryCount').textContent,'16');
   assert.equal($('#componentLibrary [data-type="mcu"]'),null);
   assert.equal($('#noResults').hidden,true);
   assert.equal($('#wires').children.length,1);

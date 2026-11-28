@@ -121,7 +121,7 @@ function connect(id, pin) {
 
 let drag = null;
 viewport.addEventListener('pointerdown', e => {
-  if (e.button !== 0 || e.target.closest('button,.wire,#empty,.zoom,.floating-tools')) return;
+  if (e.button !== 0 || e.target.closest('button,input,select,.wire,#empty,.zoom,.floating-tools')) return;
   const el = e.target.closest('.node');
   if (el) {
     hideConnectionDelete();
@@ -521,6 +521,48 @@ if ($('#saveProjectBtn')) $('#saveProjectBtn').onclick = saveProjectToServer;
 if ($('#openProjectsBtn')) $('#openProjectsBtn').onclick = openProjectsDialog;
 if ($('#closeProjectsDialog')) $('#closeProjectsDialog').onclick = () => $('#projectsDialog')?.close();
 if ($('#projectsDialog')) $('#projectsDialog').addEventListener('click', e => { if (e.target === $('#projectsDialog')) $('#projectsDialog').close(); });
+
+// Interactive canvas controls: tactile pushbutton press/hold and potentiometer knob/slider.
+$('#nodes').addEventListener('pointerdown', e => {
+  const cap = e.target.closest('.tactile-cap[data-pushbutton]');
+  if (!cap) return;
+  e.stopPropagation();
+  const n = state.nodes.find(item => item.id === cap.dataset.pushbutton);
+  if (!n) return;
+  n.pressed = true;
+  updateSignals();
+  window.Firmware?.sendInputs();
+});
+for (const ev of ['pointerup', 'pointercancel']) {
+  window.addEventListener(ev, () => {
+    let changed = false;
+    for (const n of state.nodes) {
+      if (n.type === 'pushbutton' && n.pressed) { n.pressed = false; changed = true; }
+    }
+    if (changed) { updateSignals(); window.Firmware?.sendInputs(); }
+  });
+}
+$('#nodes').addEventListener('input', e => {
+  const slider = e.target.closest('.pot-slider[data-pot]');
+  if (!slider) return;
+  e.stopPropagation();
+  const n = state.nodes.find(item => item.id === slider.dataset.pot);
+  if (!n) return;
+  n.value = Number(slider.value) / 100;
+  const body = slider.closest('.pot-body');
+  if (body) {
+    body.querySelector('.pot-dial')?.style.setProperty('--dial-deg', `${Math.round(-135 + n.value * 270)}deg`);
+    const readout = body.querySelector('.pot-readout');
+    if (readout) readout.textContent = `${slider.value}% · ${(n.value * 3.3).toFixed(2)}V`;
+  }
+  if (selected === n.id && $('#potInspectRange')) {
+    $('#potInspectRange').value = slider.value;
+    $('#potInspectText').textContent = `${slider.value}%`;
+  }
+  save();
+  updateSignals();
+  window.Firmware?.sendInputs();
+});
 
 const photoDialog = $('#componentPhotoDialog');
 $('#nodes').addEventListener('click', e => {

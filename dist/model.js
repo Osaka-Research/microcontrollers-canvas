@@ -196,7 +196,7 @@ const RobotModel=(()=>{
  function valid(s){
   if(!s||!text(s.name,60)||!Array.isArray(s.nodes)||s.nodes.length>150||!Array.isArray(s.wires)||s.wires.length>600)return false;
   const boards=s.boards??[];if(!Array.isArray(boards)||boards.length>32||!boards.every(boardValid)||!unique(boards.map(b=>b.id))||boards.reduce((sum,b)=>sum+b.image.length,0)>3000000)return false;
-  if(!s.nodes.every(n=>n&&id(n.id)&&ComponentRegistry.types().includes(n.type)&&Number.isFinite(n.x)&&Math.abs(n.x)<100000&&Number.isFinite(n.y)&&Math.abs(n.y)<100000&&Array.isArray(n.modes)&&(n.type==='board'?n.modes.length===board(s,n)?.pins.length:n.type==='esp8266'?n.modes.length===espPinDefs().length:ComponentRegistry.get(n.type)?.renderer==='generic'?[4,pins(s,n).length].includes(n.modes.length):n.modes.length===4)&&n.modes.every(m=>['low','high','blink'].includes(m))&&Number.isFinite(n.period)&&n.period>=.2&&n.period<=5&&(n.distanceCm===undefined||(Number.isFinite(n.distanceCm)&&n.distanceCm>=2&&n.distanceCm<=400))&&firmwareValid(n.firmware)&&(n.pinDirections===undefined||(n.type==='esp8266'&&Array.isArray(n.pinDirections)&&n.pinDirections.length===espPinDefs().length&&n.pinDirections.every((k,i)=>espPinDefs()[i].gpio!=null?['input','output'].includes(k):k===espPinDefs()[i].kind)))&&(n.type!=='board'||!!board(s,n))&&directionsValid(s,n)))return false;
+  if(!s.nodes.every(n=>n&&id(n.id)&&ComponentRegistry.types().includes(n.type)&&Number.isFinite(n.x)&&Math.abs(n.x)<100000&&Number.isFinite(n.y)&&Math.abs(n.y)<100000&&Array.isArray(n.modes)&&(n.type==='board'?n.modes.length===board(s,n)?.pins.length:n.type==='esp8266'?n.modes.length===espPinDefs().length:ComponentRegistry.get(n.type)?.renderer==='generic'?[4,pins(s,n).length].includes(n.modes.length):n.modes.length===4)&&n.modes.every(m=>['low','high','blink'].includes(m))&&Number.isFinite(n.period)&&n.period>=.2&&n.period<=5&&(n.distanceCm===undefined||(Number.isFinite(n.distanceCm)&&n.distanceCm>=2&&n.distanceCm<=400))&&(n.value===undefined||(Number.isFinite(n.value)&&n.value>=0&&n.value<=1))&&(n.ohms===undefined||(Number.isFinite(n.ohms)&&n.ohms>=1&&n.ohms<=10000000))&&(n.pressed===undefined||typeof n.pressed==='boolean')&&(n.latched===undefined||typeof n.latched==='boolean')&&(n.muted===undefined||typeof n.muted==='boolean')&&firmwareValid(n.firmware)&&(n.pinDirections===undefined||(n.type==='esp8266'&&Array.isArray(n.pinDirections)&&n.pinDirections.length===espPinDefs().length&&n.pinDirections.every((k,i)=>espPinDefs()[i].gpio!=null?['input','output'].includes(k):k===espPinDefs()[i].kind)))&&(n.type!=='board'||!!board(s,n))&&directionsValid(s,n)))return false;
   if(s.nodes.filter(n=>firmwareTarget(s,n)).length>4||s.nodes.reduce((sum,n)=>sum+(n.firmware?.b64?.length||0),0)>3000000)return false;
   return unique(s.nodes.map(n=>n.id))&&s.wires.every(w=>wireValid(s,w))&&unique(s.wires.map(w=>attachmentKey(s,w)))&&!!passiveNetwork(s,s.wires)&&!!seriesNetwork(s,s.wires);
  }
@@ -205,6 +205,8 @@ const RobotModel=(()=>{
   const k=kind(s,n,p);
   if(k==='power')return true;
   if(k!=='output')return false;
+  if(n.type==='pushbutton')return !!(n.pressed||n.latched);
+  if(n.type==='potentiometer')return (n.value??0.5)>=0.5;
   if(firmwareTarget(s,n))return firmwareRead?!!firmwareRead(n,p):false;
   if(n.type==='motorDriver'||n.type==='ultrasonic'){
    const key=n.id+':'+p,seen=visited||new Set();
@@ -245,6 +247,30 @@ const RobotModel=(()=>{
   const resolve=lookup||driverLookup(s),driver=resolve(n,p);
   return driver?output(s,s.nodes.find(node=>node.id===driver.from),driver.pin,started,elapsed,firmwareRead,resolve,visited):false;
  }
+ function signalMeta(s,n,p,started,elapsed,firmwareRead,firmwarePwm,lookup){
+  if(!started)return {high:false,duty:0,freq:0,pulseUs:0,analog:0};
+  const resolve=lookup||driverLookup(s),driver=resolve(n,p);
+  if(!driver)return {high:false,duty:0,freq:0,pulseUs:0,analog:0};
+  const src=s.nodes.find(node=>node.id===driver.from);
+  if(!src)return {high:false,duty:0,freq:0,pulseUs:0,analog:0};
+  if(src.type==='potentiometer'){
+   const val=Math.max(0,Math.min(1,src.value??0.5));
+   return {high:val>=0.5,duty:val,freq:0,pulseUs:0,analog:val};
+  }
+  if(firmwareTarget(s,src)&&firmwarePwm){
+   const pwm=firmwarePwm(src,driver.pin);
+   if(pwm){
+    const duty=Math.max(0,Math.min(1,pwm.duty??0));
+    const high=pwm.freq>0?duty>0.01:!!(firmwareRead?firmwareRead(src,driver.pin):duty>0.5);
+    return {high,duty,freq:pwm.freq||0,pulseUs:pwm.pulseUs||0,analog:duty};
+   }
+  }
+  const high=output(s,src,driver.pin,started,elapsed,firmwareRead,resolve);
+  return {high,duty:high?1:0,freq:0,pulseUs:0,analog:high?1:0};
+ }
+ function analogInput(s,n,p,started,elapsed,firmwareRead,firmwarePwm,lookup){
+  return signalMeta(s,n,p,started,elapsed,firmwareRead,firmwarePwm,lookup).analog;
+ }
  function wireRole(s,w){
   const from=s.nodes.find(n=>n.id===w.from),to=s.nodes.find(n=>n.id===w.to);
   const ks=[kind(s,from,w.pin),kind(s,to,w.toPin??0)];
@@ -258,8 +284,10 @@ const RobotModel=(()=>{
   for(const n of s.nodes){
    if(n.type==='led'){
     const src=sourceNode(n,0);
-    if(isCell(s,src))issues.push({severity:'warning',nodeId:n.id,title:'LED wired directly to battery',detail:'Add a series current-limiting resistor (for example 220 Ω at 3.3 V) so the LED does not burn out.'});
-    else if(src&&(src.type==='mcu'||src.type==='esp8266'||src.type==='board'))issues.push({severity:'info',nodeId:n.id,title:'Remember a series resistor on real hardware',detail:'A 5 mm red LED needs a current-limiting resistor (around 220 Ω for 3.3 V GPIO) in a physical circuit.'});
+    const directWire=s.wires.find(w=>w.to===n.id&&(w.toPin??0)===0);
+    const viaResistor=directWire&&byId.get(directWire.from)?.type==='resistor';
+    if(isCell(s,src)&&!viaResistor)issues.push({severity:'warning',nodeId:n.id,title:'LED wired directly to battery',detail:'Add a series current-limiting resistor (for example 220 Ω at 3.3 V) so the LED does not burn out.'});
+    else if(src&&!viaResistor&&(src.type==='mcu'||src.type==='esp8266'||src.type==='board'))issues.push({severity:'info',nodeId:n.id,title:'Remember a series resistor on real hardware',detail:'A 5 mm red LED needs a current-limiting resistor (around 220 Ω for 3.3 V GPIO) in a physical circuit.'});
    }else if(n.type==='motor'){
     const s0=sourceNode(n,0),s1=sourceNode(n,1);
     if([s0,s1].some(src=>src&&(src.type==='mcu'||src.type==='esp8266'||src.type==='board'))){
@@ -312,6 +340,6 @@ const RobotModel=(()=>{
   return wire;
  }
  function replaceBoard(s,next){const old=s.boards.find(b=>b.id===next.id);if(!old){s.boards.push(next);return}const nodes=s.nodes.filter(n=>n.type==='board'&&n.boardId===next.id),ids=new Set(nodes.map(n=>n.id));const remap=i=>next.pins.findIndex(p=>p.id===old.pins[i]?.id);s.wires=s.wires.flatMap(w=>{const v={...w};if(ids.has(v.from))v.pin=remap(v.pin);if(ids.has(v.to))v.toPin=remap(v.toPin??0);return v.pin<0||(v.toPin??0)<0?[]:[v]});for(const n of nodes)n.modes=next.pins.map(p=>n.modes[old.pins.findIndex(k=>k.id===p.id)]||'low');s.boards[s.boards.indexOf(old)]=next;s.wires=s.wires.filter(w=>wireValid(s,w))}
- return {boardValid,valid,get espPins(){return espPinDefs()},firmwareTarget,firmwareValid,board,pins,kind,sourceKind,isCell,seriesInfo,targetKey,attachmentKey,wireValid,wireRole,diagnostics,output,input,driverLookup,connection,replaceBoard};
+ return {boardValid,valid,get espPins(){return espPinDefs()},firmwareTarget,firmwareValid,board,pins,kind,sourceKind,isCell,seriesInfo,targetKey,attachmentKey,wireValid,wireRole,diagnostics,output,input,signalMeta,analogInput,driverLookup,connection,replaceBoard};
 })();
 if(typeof module!=='undefined')module.exports=RobotModel;

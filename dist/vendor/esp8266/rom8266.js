@@ -23,7 +23,7 @@
     var IRQ_RETURN = 0x4000fff8;       // unused ROM word; an interrupt handler returns here
     var EVT_SCRATCH = 0x600017f0;       // top of RTC RAM: ETSEvent {sig,par} handed to tasks
     var SR_INTENABLE = 228;
-    var INT_UART = 5, INT_FRC2 = 10;    // ETS_UART_INUM, the FRC2 timer's interrupt
+    var INT_UART = 5, INT_FRC1 = 9, INT_FRC2 = 10;    // ETS_UART_INUM, FRC1 (PWM), FRC2 (os_timer)
 
     // ---- os_task scheduler state ----
     var tasks = {};                     // prio -> { fn: addr }
@@ -82,6 +82,11 @@
       var ps = sys.sr.ps;
       if ((ps & 0x10) || (ps & 0xf) >= 1) return false;
       var en = sys.srRead(SR_INTENABLE) >>> 0;
+      if ((en & (1 << INT_FRC1)) && isr[INT_FRC1] && sys.frc1Due && sys.frc1Due()) {
+        sys.frc1Ack();
+        enterIsr(INT_FRC1);
+        return true;
+      }
       if ((en & (1 << INT_FRC2)) && isr[INT_FRC2] && sys.frc2Due()) {
         sys.frc2Ack();
         enterIsr(INT_FRC2);

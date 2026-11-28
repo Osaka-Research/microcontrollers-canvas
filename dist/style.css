@@ -380,3 +380,25 @@ main{position:relative;display:grid;grid-template-rows:minmax(0,1fr) auto;min-wi
 :root[data-theme="blueprint"] .firmware-tag{background:#143a66;color:#7dd3fc;border-color:#2c6299}
 :root[data-theme="blueprint"] #serialOutput{background:#061428;color:#93dcff;border:1px solid #1e4673}
 :root[data-theme="blueprint"] #toast{background:#194e8a;color:#fff;border:1px solid #4ba3e3}
+
+/* Interactive Wokwi-style components: pushbutton, potentiometer, piezo buzzer, resistor */
+.node:not(.mcu) .node-body.interactive-body{height:auto;padding:10px 12px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.tactile-cap{width:46px;height:46px;border-radius:12px;border:2px solid #4ba3e3;background:radial-gradient(circle at 35% 30%,#3b82f6,#1d4ed8);color:#fff;font-size:8px;font-weight:700;letter-spacing:.06em;box-shadow:0 4px 0 #0f2c59,0 6px 12px #0004;transition:transform .06s,box-shadow .06s;cursor:pointer}
+.tactile-cap:active,.tactile-cap.pressed{transform:translateY(3px);box-shadow:0 1px 0 #0f2c59,0 0 14px #38bdf888;background:radial-gradient(circle at 35% 30%,#38bdf8,#0284c7)}
+.pot-dial{position:relative;width:44px;height:44px;border-radius:50%;border:2px solid #5aa7e6;background:radial-gradient(circle at 35% 30%,#2a4d78,#102847);box-shadow:inset 0 2px 4px #ffffff22,0 3px 8px #0004;transform:rotate(var(--dial-deg,0deg));transition:transform .06s linear}
+.pot-dial i{position:absolute;left:50%;top:4px;width:3px;height:14px;transform:translateX(-50%);border-radius:2px;background:#ffd166;box-shadow:0 0 6px #ffd166aa}
+.pot-slider{width:100%;accent-color:#38bdf8;cursor:pointer;margin:0}
+.pot-readout{font-size:9px;color:var(--muted);letter-spacing:.02em}
+.buzzer-disc{position:relative;width:40px;height:40px;border-radius:50%;border:2px solid #4c657c;background:radial-gradient(circle,#1e293b 0 28%,#0f172a 30% 100%);display:grid;place-items:center}
+.buzzer-disc i{width:10px;height:10px;border-radius:50%;background:#64748b}
+.buzzer-disc.on{border-color:#ffd166;box-shadow:0 0 0 4px #ffd16633,0 0 18px #ffd16688;animation:buzzerPulse .35s ease-in-out infinite alternate}
+.buzzer-disc.on i{background:#ffd166}
+@keyframes buzzerPulse{from{transform:scale(1)}to{transform:scale(1.08)}}
+.resistor-art{display:flex;align-items:center;width:100%;justify-content:center}
+.res-lead{width:24px;height:3px;background:#9fb3c8;border-radius:2px}
+.res-body{display:flex;align-items:stretch;justify-content:space-evenly;width:62px;height:18px;border-radius:6px;background:#e4cfa3;border:1px solid #a88d59;padding:0 6px}
+.res-body i{width:5px;display:block}
+.res-body .b1{background:#c93b2b}
+.res-body .b2{background:#c93b2b}
+.res-body .b3{background:#7c4724}
+.res-body .b4{background:#d4af37}

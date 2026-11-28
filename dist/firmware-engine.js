@@ -23,6 +23,21 @@ const FirmwareEngine=(()=>{
  function create(spec,emit=()=>{}){
   const sys=globalThis.ESP8266.createSystem();let rom=null,data,image,steps=0;
   const uart=b=>emit(b&255);
+  // Track per-GPIO toggle edges in emulated microseconds to decode real PWM duty, pulse width, and frequency.
+  const pinTrack=Array.from({length:17},()=>({level:0,edgeUs:0,highUs:0,lowUs:0,lastRiseUs:0,periodUs:0,toggledUs:-1}));
+  sys.onGpioChange=(out,enable,us)=>{
+   const driven=(out&enable)>>>0;
+   for(let g=0;g<16;g++){
+    const lvl=(driven>>>g)&1,t=pinTrack[g];
+    if(lvl===t.level)continue;
+    const dt=us-t.edgeUs;
+    if(dt>0){
+     if(t.level===1){t.highUs=dt}
+     else{t.lowUs=dt;if(t.lastRiseUs>0)t.periodUs=us-t.lastRiseUs;t.lastRiseUs=us}
+    }
+    t.level=lvl;t.edgeUs=us;t.toggledUs=us;
+   }
+  };
   if(spec.preset==='blink'){
    const fw=globalThis.ESP8266_FW_BLINK;data=decode(fw.b64);sys.loadImage(data,fw.loadAddr);sys.setEntry(fw.entry);sys.onUartTx=uart;
   }else{
@@ -32,7 +47,33 @@ const FirmwareEngine=(()=>{
    function reset(inside=false){sys.reset(inside);sys.mem.sramI.fill(0);sys.mem.sramD.fill(0);rom.__reset(!inside);for(const s of image.segments)sys.loadImage(data.subarray(s.offset,s.offset+s.size),s.address);rom.__installRomData();sys.setEntry(image.entry);sys.setSp(0x3ffffff0)}
    sys.onUartTx=uart;sys.setRomHook(pc=>{if(pc===rom.__IRQ_RETURN){rom.__irqReturn();return true}const handler=rom[globalThis.ESP8266_ROMSYM[pc>>>0]];if(handler)return handler();sys.setAr(2,0);return false});reset();
   }
-  return {sys,step(count=1){for(let i=0;i<count;i++){sys.step();if((++steps&1023)===0)rom?.__pumpIrq();if(sys.isHalted())throw Error('Firmware halted at 0x'+sys.getPc().toString(16)+'. This image may require unsupported instructions or peripherals.')}},send(text){if(sys.rxfifoLen()+text.length>4096)throw Error('Serial input buffer is full. Run the firmware before sending more.');for(const ch of text)sys.feedRx(ch.charCodeAt(0))},inputs(mask,value){sys.setExternalInputs(mask,value)},outputs(){return {out:(sys.gpio.out|((sys.getPeri(0x60000768)&1)<<16))>>>0,enable:(sys.gpio.enable|((sys.getPeri(0x60000774)&1)<<16))>>>0,pc:sys.getPc(),instructions:sys.getInstret(),us:sys.getUs()}}};
+  return {
+   sys,
+   step(count=1){for(let i=0;i<count;i++){sys.step();if((++steps&255)===0)rom?.__pumpIrq();if(sys.isHalted())throw Error('Firmware halted at 0x'+sys.getPc().toString(16)+'. This image may require unsupported instructions or peripherals.')}},
+   send(text){if(sys.rxfifoLen()+text.length>4096)throw Error('Serial input buffer is full. Run the firmware before sending more.');for(const ch of text)sys.feedRx(ch.charCodeAt(0))},
+   inputs(mask,value){sys.setExternalInputs(mask,value)},
+   adc(value01){sys.setAdc?.(value01)},
+   outputs(){
+    const out=(sys.gpio.out|((sys.getPeri(0x60000768)&1)<<16))>>>0;
+    const enable=(sys.gpio.enable|((sys.getPeri(0x60000774)&1)<<16))>>>0;
+    const nowUs=sys.getUs();
+    const duty=new Array(17),freq=new Array(17),pulseUs=new Array(17);
+    for(let g=0;g<17;g++){
+     const bit=((out&enable)>>>g)&1,t=pinTrack[g];
+     const recent=t.toggledUs>=0&&(nowUs-t.toggledUs)<250000&&(t.highUs+t.lowUs)>0;
+     if(recent&&((enable>>>g)&1)){
+      const sum=t.highUs+t.lowUs;
+      duty[g]=Math.max(0,Math.min(1,t.highUs/sum));
+      const period=t.periodUs>0?t.periodUs:sum;
+      freq[g]=period>0?Math.round(1e6/period):0;
+      pulseUs[g]=Math.round(t.highUs);
+     }else{
+      duty[g]=bit?1:0;freq[g]=0;pulseUs[g]=0;
+     }
+    }
+    return {out,enable,duty,freq,pulseUs,pc:sys.getPc(),instructions:sys.getInstret(),us:nowUs};
+   }
+  };
  }
  return {parseImage,create,decode};
 })();

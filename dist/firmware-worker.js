@@ -1,6 +1,6 @@
 'use strict';
 self.window=self;
-importScripts('vendor/esp8266/xtensa-esp8266.js?v=20261124.3','vendor/esp8266/rom-symbols.js?v=20261124.3','vendor/esp8266/rom8266.js?v=20261124.3','vendor/esp8266/firmware/blink.js?v=20261124.3','firmware-engine.js?v=20261124.3');
+importScripts('vendor/esp8266/xtensa-esp8266.js?v=20261128.1','vendor/esp8266/rom-symbols.js?v=20261124.3','vendor/esp8266/rom8266.js?v=20261128.1','vendor/esp8266/firmware/blink.js?v=20261124.3','firmware-engine.js?v=20261128.1');
 let machine=null,active=false,timer=null,serial='',last=0,scale=1;
 function publish(){if(!machine)return;postMessage({type:'state',...machine.outputs(),serial});serial=''}
 function stop(){active=false;clearTimeout(timer);timer=null;last=0}
@@ -12,4 +12,5 @@ onmessage=({data:m})=>{try{
  if(m.type==='pause'){stop();publish()}
  if(m.type==='serial'&&machine)machine.send(String(m.text).slice(0,2048));
  if(m.type==='inputs'&&machine)machine.inputs(m.mask,m.value);
+ if(m.type==='adc'&&machine)machine.adc(m.value);
  }catch(e){fail(e)}};

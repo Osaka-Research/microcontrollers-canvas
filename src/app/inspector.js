@@ -193,16 +193,51 @@ function inspector() {
     return;
   }
   const sonarDist = n?.distanceCm ?? 40;
+  const potPct = Math.round(Math.max(0, Math.min(1, n?.value ?? 0.5)) * 100);
+  const resOhms = n?.ohms ?? 220;
   const pack = n?.type === 'battery' ? batteryInfo(n) : null;
   const helpText = pack
     ? `${pack.description || ''} Connect V+ and GND only to a load with a matching voltage rating. This canvas does not simulate voltage under load, charging, or current.`
     : (def?.help || 'Component loaded from catalog. Review manufacturer documentation before wiring real hardware.');
+  const extraControls = n?.type === 'ultrasonic'
+    ? `<label class="field-label" for="sonarDistance">Simulated target: <span id="sonarDistanceText">${sonarDist}</span> cm (~<span id="sonarPulseText">${Math.round(sonarDist * 58)}</span> µs)</label><input class="range" id="sonarDistance" type="range" min="2" max="400" step="1" value="${sonarDist}">`
+    : n?.type === 'pushbutton'
+      ? `<label class="signal-row"><span>Latch switch (stay HIGH)</span><input type="checkbox" id="buttonLatch" ${n.latched ? 'checked' : ''}></label>`
+      : n?.type === 'potentiometer'
+        ? `<label class="field-label" for="potInspectRange">Wiper position: <span id="potInspectText">${potPct}%</span></label><input class="range" id="potInspectRange" type="range" min="0" max="100" step="1" value="${potPct}">`
+        : n?.type === 'buzzer'
+          ? `<label class="signal-row"><span>Mute speaker audio</span><input type="checkbox" id="buzzerMute" ${n.muted ? 'checked' : ''}></label>`
+          : n?.type === 'resistor'
+            ? `<label class="signal-row"><span>Resistance</span><select id="resistorOhms">${[220, 330, 1000, 4700, 10000].map(v => `<option value="${v}" ${resOhms === v ? 'selected' : ''}>${v >= 1000 ? (v / 1000) + ' kΩ' : v + ' Ω'}</option>`).join('')}</select></label>`
+            : '';
   $('#inspectorContent').innerHTML = n
-    ? `<h2 class="inspect-name">${esc(componentLabel(n))}</h2><div class="inspect-type">${esc(def?.category || 'Component')}</div>${n.type === 'mcu' ? `<label class="field-label">OUTPUT BEHAVIOR</label>${n.modes.map((m, p) => `<label class="signal-row">D${p}<select data-mode="${p}" aria-label="D${p} behavior"><option value="low" ${m === 'low' ? 'selected' : ''}>Low</option><option value="high" ${m === 'high' ? 'selected' : ''}>High</option><option value="blink" ${m === 'blink' ? 'selected' : ''}>Pulse</option></select></label>`).join('')}<label class="field-label" for="period">Pulse cycle: <span id="periodText">${n.period.toFixed(1)}</span>s</label><input class="range" id="period" type="range" min="0.2" max="5" step="0.1" value="${n.period}"><p class="inspect-help">${esc(helpText)}</p>` : `<div class="reading" id="reading"></div>${n.type === 'ultrasonic' ? `<label class="field-label" for="sonarDistance">Simulated target: <span id="sonarDistanceText">${sonarDist}</span> cm (~<span id="sonarPulseText">${Math.round(sonarDist * 58)}</span> µs)</label><input class="range" id="sonarDistance" type="range" min="2" max="400" step="1" value="${sonarDist}">` : ''}<p class="inspect-help">${esc(helpText)}</p>${sourceLinksHTML(def, pack?.source)}${state.wires.some(w => w.to === n.id || w.from === n.id) ? '<button class="remove-wire" id="disconnect">Disconnect all</button>' : ''}`}<button class="remove-wire" id="removeSelected">Remove component</button>`
+    ? `<h2 class="inspect-name">${esc(componentLabel(n))}</h2><div class="inspect-type">${esc(def?.category || 'Component')}</div>${n.type === 'mcu' ? `<label class="field-label">OUTPUT BEHAVIOR</label>${n.modes.map((m, p) => `<label class="signal-row">D${p}<select data-mode="${p}" aria-label="D${p} behavior"><option value="low" ${m === 'low' ? 'selected' : ''}>Low</option><option value="high" ${m === 'high' ? 'selected' : ''}>High</option><option value="blink" ${m === 'blink' ? 'selected' : ''}>Pulse</option></select></label>`).join('')}<label class="field-label" for="period">Pulse cycle: <span id="periodText">${n.period.toFixed(1)}</span>s</label><input class="range" id="period" type="range" min="0.2" max="5" step="0.1" value="${n.period}"><p class="inspect-help">${esc(helpText)}</p>` : `<div class="reading" id="reading"></div>${extraControls}<p class="inspect-help">${esc(helpText)}</p>${sourceLinksHTML(def, pack?.source)}${state.wires.some(w => w.to === n.id || w.from === n.id) ? '<button class="remove-wire" id="disconnect">Disconnect all</button>' : ''}`}<button class="remove-wire" id="removeSelected">Remove component</button>`
     : '<div class="inspect-empty"><span class="inspect-icon">⌗</span><strong>Nothing selected</strong><p>Select a component on the canvas to see its properties.</p></div>';
   connectionInspector(n);
   if (!n) return;
   document.querySelectorAll('[data-mode]').forEach(s => s.onchange = () => { snapshot(); n.modes[+s.dataset.mode] = s.value; save(); updateSignals(); });
+  if ($('#buttonLatch')) $('#buttonLatch').onchange = e => { snapshot(); n.latched = !!e.target.checked; save(); updateSignals(); window.Firmware?.sendInputs(); };
+  if ($('#potInspectRange')) {
+    $('#potInspectRange').onpointerdown = () => snapshot();
+    $('#potInspectRange').oninput = e => {
+      n.value = Number(e.target.value) / 100;
+      $('#potInspectText').textContent = `${e.target.value}%`;
+      const nodeEl = document.querySelector(`[data-id="${n.id}"]`);
+      if (nodeEl) {
+        const slider = nodeEl.querySelector('.pot-slider');
+        if (slider) slider.value = e.target.value;
+        const dial = nodeEl.querySelector('.pot-dial');
+        if (dial) dial.style.setProperty('--dial-deg', `${Math.round(-135 + n.value * 270)}deg`);
+        const readout = nodeEl.querySelector('.pot-readout');
+        if (readout) readout.textContent = `${e.target.value}% · ${(n.value * 3.3).toFixed(2)}V`;
+      }
+      save();
+      updateSignals();
+      window.Firmware?.sendInputs();
+    };
+  }
+  if ($('#buzzerMute')) $('#buzzerMute').onchange = e => { snapshot(); n.muted = !!e.target.checked; save(); updateSignals(); };
+  if ($('#resistorOhms')) $('#resistorOhms').onchange = e => { snapshot(); n.ohms = Number(e.target.value); render(); };
   if ($('#period')) {
     $('#period').onpointerdown = () => snapshot();
     $('#period').onkeydown = e => { if (e.key.startsWith('Arrow')) snapshot(); };

@@ -93,6 +93,31 @@ window.refreshTemplates = templates => {
   renderTemplates();
 };
 
+window.applyExternalProject = (project, sourceLabel = 'AI agent (MCP)') => {
+  if (!project || typeof project !== 'object') return false;
+  const next = migrateProject(structuredClone(project));
+  next.boards ??= [];
+  if (!valid(next)) return false;
+  snapshot();
+  pendingRestore = null;
+  currentProjectId = null;
+  state = next;
+  selected = next.nodes.at(-1)?.id || null;
+  selectedWire = null;
+  pending = null;
+  running = false;
+  started = false;
+  elapsed = 0;
+  stopLoop();
+  $('#run').innerHTML = '▶ <span>Run simulation</span>';
+  $('#simLabel').textContent = 'Simulation stopped';
+  $('#status').textContent = `Loaded from ${sourceLabel}`;
+  render();
+  $('#resetView').click();
+  toast(`Circuit pushed from ${sourceLabel}: ${next.name}`);
+  return true;
+};
+
 window.CanvasAI = {
   current() {
     return state.nodes.map((n, index) => ({

@@ -127,6 +127,14 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/api/components') return api(componentsHandler, req, res);
   if (url.pathname === '/api/templates') return api(templatesHandler, req, res);
   if (url.pathname === '/api/projects') return api(projectsHandler, req, res);
+  if (url.pathname === '/api/canvas/live' && req.method === 'GET') {
+    try {
+      const raw = await readFile(path.join(dataDir, 'live-canvas.json'), 'utf8');
+      return send(res, 200, JSON.parse(raw));
+    } catch {
+      return send(res, 200, { version: 0, project: null });
+    }
+  }
   if (url.pathname === '/api/build') { req.chatgpt = chatgpt; return api(buildHandler, req, res); }
   if (url.pathname === '/api/chatgpt/session' && req.method === 'GET') {
     try { return send(res, 200, { session: await chatgpt.getSession(), localOnly: true }); }

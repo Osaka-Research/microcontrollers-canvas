@@ -41,4 +41,26 @@
  refresh(true);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-lastCheck>=15000)refresh(true)});
  window.setInterval(()=>refresh(false),15000);
+
+ // Listen for live MCP agent pushes when running on the local MCC server.
+ if(['localhost','127.0.0.1'].includes(location.hostname)){
+  const liveEndpoint=new URL(endpoint,location.href).origin+'/api/canvas/live';
+  let liveVersion=null;
+  async function checkLiveCanvas(){
+   if(document.hidden)return;
+   try{
+    const res=await fetch(liveEndpoint,{headers:{Accept:'application/json'},cache:'no-store'});
+    if(!res.ok)return;
+    const data=await res.json();
+    const v=Number(data?.version||0);
+    if(liveVersion===null){liveVersion=v;return}
+    if(v>liveVersion&&data?.project){
+     liveVersion=v;
+     window.applyExternalProject?.(data.project,'AI agent (MCP)');
+    }
+   }catch{}
+  }
+  checkLiveCanvas();
+  window.setInterval(checkLiveCanvas,3000);
+ }
 })();

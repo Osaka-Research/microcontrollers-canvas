@@ -1,6 +1,13 @@
+// @ts-check
 'use strict';
+
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
+
+/** @type {{ key: string, definitions: any[] } | null} */
+let localCatalogCache = null;
+/** @type {{ key: string, templates: any[] } | null} */
+let localTemplatesCache = null;
 
 const base = () => {
   const url = process.env.SUPABASE_URL;
@@ -9,9 +16,37 @@ const base = () => {
   return { url: url.replace(/\/$/, ''), key };
 };
 
+/**
+ * Compute a cheap filesystem fingerprint for a SQLite DB + its WAL file.
+ * @param {string} dbPath
+ */
+function sqliteStamp(dbPath) {
+  const parts = [dbPath];
+  for (const suffix of ['', '-wal']) {
+    try {
+      const s = fs.statSync(dbPath + suffix);
+      parts.push(`${s.size}:${s.mtimeMs}`);
+    } catch {
+      parts.push('missing');
+    }
+  }
+  return parts.join('|');
+}
+
+function invalidateLocalCache() {
+  localCatalogCache = null;
+  localTemplatesCache = null;
+}
+
 function localDefinitions() {
   const dbPath = process.env.LOCAL_COMPONENT_DB;
   if (!dbPath) return null;
+
+  const stamp = sqliteStamp(dbPath);
+  if (localCatalogCache && localCatalogCache.key === stamp) {
+    return localCatalogCache.definitions;
+  }
+
   const { DatabaseSync } = require('node:sqlite');
   const definitions = new Map();
 
@@ -23,10 +58,10 @@ function localDefinitions() {
       AND json_array_length(json_extract(c.definition, '$.pins')) > 0
       AND json_extract(c.definition, '$.needsPinoutResearch') = 0`).all();
     for (const row of rows) {
-      const definition = JSON.parse(row.definition);
+      const definition = JSON.parse(String(row.definition));
       if (definition.enabled === false) continue;
       if (row.raw_json) {
-        const product = JSON.parse(row.raw_json);
+        const product = JSON.parse(String(row.raw_json));
         definition.productDetails = {
           price: product.product_price || '',
           stock: product.product_stock || '',
@@ -53,12 +88,19 @@ function localDefinitions() {
     const match = String(localPath).match(/(?:images(?:-cropped)?\/)?(\d+)\.jpg$/);
     if (match) definition.visual = { ...(definition.visual || {}), assetUrl: `/local-assets/${match[1]}.jpg` };
   }
+  localCatalogCache = { key: stamp, definitions: ready };
   return ready;
 }
 
 function localTemplates() {
   const dbPath = process.env.LOCAL_COMPONENT_DB;
   if (!dbPath) return null;
+
+  const stamp = sqliteStamp(dbPath);
+  if (localTemplatesCache && localTemplatesCache.key === stamp) {
+    return localTemplatesCache.templates;
+  }
+
   const { DatabaseSync } = require('node:sqlite');
   const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
@@ -66,7 +108,9 @@ function localTemplates() {
       SELECT id, name, category, difficulty, description, real_world_notes AS realWorldNotes, project, updated_at AS updatedAt
       FROM project_templates WHERE status = 'ready' ORDER BY category, name
     `).all();
-    return rows.map(row => ({ ...row, project: JSON.parse(row.project) }));
+    const templates = rows.map(row => ({ ...row, project: JSON.parse(String(row.project)) }));
+    localTemplatesCache = { key: stamp, templates };
+    return templates;
   } catch {
     return [];
   } finally {
@@ -110,6 +154,11 @@ async function publishedCatalog() {
   return definitions;
 }
 
+/**
+ * Persist AI-discovered candidate parts as unreviewed drafts so visitors
+ * cannot inject unverified pinouts into the shared public catalog.
+ * @param {any[]} definitions
+ */
 async function savePublishedCatalog(definitions) {
   if (process.env.LOCAL_COMPONENT_DB) {
     const { DatabaseSync } = require('node:sqlite');
@@ -121,10 +170,11 @@ async function savePublishedCatalog(definitions) {
     try {
       db.exec('BEGIN IMMEDIATE');
       for (const source of definitions) {
-        const definition = { ...source, enabled: false, needsPinoutResearch: true };
+        const definition = { ...source, enabled: false, needsPinoutResearch: true, aiDiscovered: true };
         upsert.run(definition.id, definition.category || 'OTHER ELECTRONICS', JSON.stringify(definition), now);
       }
       db.exec('COMMIT');
+      invalidateLocalCache();
     } catch (error) {
       db.exec('ROLLBACK');
       throw error;
@@ -143,9 +193,11 @@ async function savePublishedCatalog(definitions) {
       if (parsed.protocol !== 'https:' || parsed.username || parsed.password ||
           parsed.origin !== process.env.COMPONENT_IMAGE_ORIGIN) continue;
       const image = await fetch(parsed, { redirect: 'error', signal: AbortSignal.timeout(8000) });
-      const mime = image.headers.get('content-type')?.split(';')[0].toLowerCase();
-      const extension = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[mime];
-      if (!image.ok || !extension) continue;
+      const mime = image.headers.get('content-type')?.split(';')[0].toLowerCase() || '';
+      /** @type {Record<string, string>} */
+      const extensions = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+      const extension = extensions[mime];
+      if (!image.ok || !extension || !image.body) continue;
       const chunks = [];
       let size = 0;
       for await (const chunk of image.body) {
@@ -164,7 +216,18 @@ async function savePublishedCatalog(definitions) {
       }
     } catch { /* Keep the verified source link and generic symbol when an image cannot be safely copied. */ }
   }
-  const rows = definitions.map(definition => ({ id: definition.id, category: definition.category, status: 'published', version: 1, definition, updated_at: new Date().toISOString() }));
+  const now = new Date().toISOString();
+  const rows = definitions.map(source => {
+    const definition = { ...source, enabled: false, needsPinoutResearch: true, aiDiscovered: true };
+    return {
+      id: definition.id,
+      category: definition.category || 'OTHER ELECTRONICS',
+      status: 'draft',
+      version: 1,
+      definition,
+      updated_at: now
+    };
+  });
   const response = await fetch(`${url}/rest/v1/component_catalog?on_conflict=id`, {
     method: 'POST',
     headers: { apikey: key, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
@@ -173,4 +236,4 @@ async function savePublishedCatalog(definitions) {
   if (!response.ok) throw new Error(`Could not save researched components (${response.status}).`);
 }
 
-module.exports = { publishedCatalog, publishedTemplates, savePublishedCatalog };
+module.exports = { publishedCatalog, publishedTemplates, savePublishedCatalog, invalidateLocalCache };

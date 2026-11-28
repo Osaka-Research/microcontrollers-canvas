@@ -16,8 +16,10 @@ process.env.LOCAL_COMPONENT_DB ||= path.join(dataDir, 'catalog.sqlite');
 const require = createRequire(import.meta.url);
 const componentsHandler = require('../api/components.js');
 const templatesHandler = require('../api/templates.js');
+const projectsHandler = require('../api/projects.js');
 const buildHandler = require('../api/build.js');
 const { publishedCatalog } = require('../api/lib/catalog.js');
+const { checkLocalRequest } = require('../api/lib/local-guard.js');
 const { DatabaseSync } = require('node:sqlite');
 const port = Number(process.env.PORT || 4173);
 const host = process.env.HOST || '127.0.0.1';
@@ -33,12 +35,32 @@ const mime = {
   '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2'
 };
 
+const CSP_HEADER = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "connect-src 'self' https:",
+  "worker-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'"
+].join('; ');
+
+function securityHeaders(isHtml = false) {
+  return {
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'same-origin',
+    ...(isHtml ? { 'Content-Security-Policy': CSP_HEADER, 'X-Frame-Options': 'DENY' } : {})
+  };
+}
+
 function send(res, status, body, type = 'application/json; charset=utf-8') {
-  res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store' });
+  res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', ...securityHeaders(type.startsWith('text/html')) });
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
 }
 
-async function requestBody(req, limit = 1024 * 1024) {
+async function requestBody(req, limit = 4 * 1024 * 1024) {
   const chunks = [];
   let length = 0;
   for await (const chunk of req) {
@@ -52,7 +74,7 @@ async function requestBody(req, limit = 1024 * 1024) {
 }
 
 async function api(handler, req, res) {
-  if (req.method === 'POST') {
+  if (req.method === 'POST' || req.method === 'DELETE') {
     try { req.body = await requestBody(req); }
     catch (error) { return send(res, 400, { error: error.message }); }
   }
@@ -73,7 +95,7 @@ async function localImage(id, res) {
   if (!absolute.startsWith(dataDir + path.sep)) return send(res, 404, { error: 'Image not found.' });
   try { await access(absolute); }
   catch { return send(res, 404, { error: 'Image not found.' }); }
-  res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache' });
+  res.writeHead(200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-cache', ...securityHeaders() });
   createReadStream(absolute).pipe(res);
 }
 
@@ -88,14 +110,23 @@ async function staticFile(pathname, res) {
   try { fileStat = await stat(absolute); }
   catch { return send(res, 404, 'Not found', 'text/plain; charset=utf-8'); }
   if (!fileStat.isFile()) return send(res, 404, 'Not found', 'text/plain; charset=utf-8');
-  res.writeHead(200, { 'Content-Type': mime[path.extname(absolute).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+  const contentType = mime[path.extname(absolute).toLowerCase()] || 'application/octet-stream';
+  res.writeHead(200, {
+    'Content-Type': contentType,
+    'Cache-Control': 'no-cache',
+    ...securityHeaders(contentType.startsWith('text/html'))
+  });
   createReadStream(absolute).pipe(res);
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+  const url = new URL(req.url || '/', `http://${req.headers.host || `${host}:${port}`}`);
+  const guard = checkLocalRequest({ method: req.method, headers: req.headers, pathname: url.pathname }, port);
+  if (!guard.ok) return send(res, guard.status || 403, { error: guard.error });
+
   if (url.pathname === '/api/components') return api(componentsHandler, req, res);
   if (url.pathname === '/api/templates') return api(templatesHandler, req, res);
+  if (url.pathname === '/api/projects') return api(projectsHandler, req, res);
   if (url.pathname === '/api/build') { req.chatgpt = chatgpt; return api(buildHandler, req, res); }
   if (url.pathname === '/api/chatgpt/session' && req.method === 'GET') {
     try { return send(res, 200, { session: await chatgpt.getSession(), localOnly: true }); }
@@ -140,6 +171,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(port, host, () => {
   console.log(`Microcontrollers Canvas local server: http://${host}:${port}`);
   console.log(`Local catalog API: http://${host}:${port}/api/components`);
+  console.log(`Local projects API: http://${host}:${port}/api/projects`);
   console.log(`Catalog status: http://${host}:${port}/healthz`);
   console.log('Local Adafruit photos are served only to this device; nothing is uploaded.');
 });

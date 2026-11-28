@@ -4,8 +4,11 @@
   "private": true,
   "description": "Local development runtime for Microcontrollers Canvas",
   "scripts": {
+    "build": "node scripts/build-dist.mjs",
     "build:siwc": "npm run build --prefix vendor/siwc-local",
     "start": "node scripts/serve-local-canvas.mjs",
+    "test": "node --test tests/*.test.cjs",
+    "typecheck": "tsc --noEmit",
     "worker:adafruit": "node scripts/adafruit-catalog-worker.mjs",
     "worker:adafruit:status": "node scripts/adafruit-catalog-worker.mjs --status",
     "worker:templates": "node scripts/template-catalog-worker.mjs",

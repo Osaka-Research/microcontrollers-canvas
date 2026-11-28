@@ -1,10 +1,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
-const { PGlite } = require('../.qa/node_modules/@electric-sql/pglite');
+const { PGlite } = (() => { try { return require('@electric-sql/pglite'); } catch { return require('../.qa/node_modules/@electric-sql/pglite'); } })();
 const components = require('../api/components.js');
 const templates = require('../api/templates.js');
 const build = require('../api/build.js');
+const { resetRateLimits } = require('../api/lib/rate-limit.js');
 
 async function request(handler, method, body) {
   const res = { setHeader() {}, end(value) { this.body = JSON.parse(value); } };
@@ -68,9 +69,14 @@ test('seed, catalog API, build API and project tables use the migrated database'
   assert.equal(seeded.body.definitions.find(def => def.id === 'battery').variants.length, 5);
   const built = await request(build, 'POST', { action: 'build', apiKey: 'local-test-placeholder-key', idea: 'Add a test part', context: {} });
   assert.equal(built.statusCode, 200);
-  assert.deepEqual(built.body.plan, plan);
+  assert.deepEqual(built.body.plan, { ...plan, components: [{ type: 'testpart', pack: '', pinDirections: [] }] });
   assert.equal(built.body.definitions[0].id, discovered.id);
-  assert.ok((await request(components, 'GET')).body.definitions.some(def => def.id === discovered.id));
+  // AI-discovered parts are saved as unreviewed drafts, not auto-published to all visitors.
+  assert.equal((await request(components, 'GET')).body.definitions.some(def => def.id === discovered.id), false);
+  const draftRow = await db.query('select status, definition from component_catalog where id=$1', [discovered.id]);
+  assert.equal(draftRow.rows[0].status, 'draft');
+  assert.equal(draftRow.rows[0].definition.needsPinoutResearch, true);
+  resetRateLimits();
 
   const owner = '01234567-89ab-4def-8123-456789abcdef';
   const id = '11234567-89ab-4def-8123-456789abcdef';

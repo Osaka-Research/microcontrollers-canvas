@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const { JSDOM } = require('../.qa/node_modules/jsdom');
+const { JSDOM } = (() => { try { return require('jsdom'); } catch { return require('../.qa/node_modules/jsdom'); } })();
 
 function boot(url = 'http://127.0.0.1:4173', fetchImpl) {
   const dom = new JSDOM(fs.readFileSync('dist/index.html', 'utf8'), { url, runScripts: 'outside-only' });

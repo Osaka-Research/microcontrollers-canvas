@@ -2,11 +2,16 @@
 (()=>{
  const endpoint=window.COMPONENT_CATALOG_ENDPOINT||(window.CANVAS_AI_ENDPOINT?new URL(window.CANVAS_AI_ENDPOINT,location.href).origin+'/api/components':'/api/components');
  const templatesEndpoint=new URL(endpoint,location.href).origin+'/api/templates';
- let previous='',previousTemplates='',lastCheck=0;
+ let previous='',previousTemplates='',componentsEtag='',templatesEtag='',lastCheck=0;
  async function refreshTemplates(){
   try{
-   const response=await fetch(templatesEndpoint,{headers:{Accept:'application/json'},cache:'no-store'});
+   const headers={Accept:'application/json'};
+   if(templatesEtag)headers['If-None-Match']=templatesEtag;
+   const response=await fetch(templatesEndpoint,{headers,cache:'no-cache'});
+   if(response.status===304)return;
    if(!response.ok)return;
+   const nextEtag=response.headers?.get?.('etag')||'';
+   if(nextEtag)templatesEtag=nextEtag;
    const data=await response.json();
    if(!Array.isArray(data.templates))return;
    const signature=JSON.stringify(data.templates);
@@ -17,8 +22,13 @@
   if(!force&&document.hidden)return;
   lastCheck=Date.now();
   try{
-   const response=await fetch(endpoint,{headers:{Accept:'application/json'},cache:'no-store'});
+   const headers={Accept:'application/json'};
+   if(componentsEtag)headers['If-None-Match']=componentsEtag;
+   const response=await fetch(endpoint,{headers,cache:'no-cache'});
+   if(response.status===304){refreshTemplates();return}
    if(!response.ok)throw Error(`Catalog request failed (${response.status})`);
+   const nextEtag=response.headers?.get?.('etag')||'';
+   if(nextEtag)componentsEtag=nextEtag;
    const data=await response.json();
    if(!Array.isArray(data.definitions)||!data.definitions.length)throw Error('Catalog is empty');
    const signature=JSON.stringify(data.definitions);
